@@ -416,6 +416,14 @@ func wrapGenericHandler(core *vault.Core, h http.Handler, props *vault.HandlerPr
 		ns := r.Header.Get(consts.NamespaceHeaderName)
 		if ns != "" {
 			nw.Header().Set(consts.NamespaceHeaderName, ns)
+			ns0, err := namespace.FromContext(r.Context())
+			if err != nil {
+				respondError(nw, http.StatusInternalServerError, fmt.Errorf("failed to set namespace in the header"))
+				cancelFunc()
+				return
+			}
+			ns0.Path = ns
+			r.WithContext(namespace.ContextWithNamespace(r.Context(), ns0))
 		}
 
 		h.ServeHTTP(nw, r)
