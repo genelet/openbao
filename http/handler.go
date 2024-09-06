@@ -93,6 +93,10 @@ var (
 		"/v1/sys/mounts/",
 		"/v1/sys/policy",
 		"/v1/sys/policy/",
+		// oss start
+		"/v1/sys/namespaces",
+		"/v1/sys/namespaces/",
+		// oss end
 		"/v1/sys/rekey/backup",
 		"/v1/sys/rekey/recovery-key-backup",
 		"/v1/sys/remount",
@@ -416,16 +420,9 @@ func wrapGenericHandler(core *vault.Core, h http.Handler, props *vault.HandlerPr
 		ns := r.Header.Get(consts.NamespaceHeaderName)
 		if ns != "" {
 			nw.Header().Set(consts.NamespaceHeaderName, ns)
-			ns0, err := namespace.FromContext(r.Context())
-			if err != nil {
-				respondError(nw, http.StatusInternalServerError, fmt.Errorf("failed to set namespace in the header"))
-				cancelFunc()
-				return
-			}
-			ns0.Path = ns
-			r.WithContext(namespace.ContextWithNamespace(r.Context(), ns0))
 		}
 
+		core.Logger().Debug("Request received BBBBBBBB", "path", r.URL.Path, "method", r.Method, "client", clientAddr)
 		h.ServeHTTP(nw, r)
 
 		cancelFunc()
