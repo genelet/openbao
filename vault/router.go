@@ -577,7 +577,7 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 	r.l.RLock()
 	adjustedPath := req.Path
 	// oss start
-	//mount, raw, ok := r.root.LongestPrefix(adjustedPath)
+	// mount, raw, ok := r.root.LongestPrefix(adjustedPath)
 	// oss end
 	mount, raw, ok := r.root.LongestPrefix(path.Join(ns.Path, adjustedPath))
 	r.logger.Trace("Routing request 1000", "join", path.Join(ns.Path, adjustedPath), "ns.Path", ns.Path, "reqPath", req.Path, "mount", mount, "ok", ok)

@@ -38,16 +38,14 @@ const (
 	namespaceSubPath = "namespaces/"
 )
 
-var (
-	immutableNamespaces = []string{
-		"root",
-		"sys",
-		"audit",
-		"auth",
-		"cubbyhole",
-		"identity",
-	}
-)
+var immutableNamespaces = []string{
+	"root",
+	"sys",
+	"audit",
+	"auth",
+	"cubbyhole",
+	"identity",
+}
 
 func (b *SystemBackend) namespacePaths() []*framework.Path {
 	return []*framework.Path{
@@ -105,7 +103,7 @@ func (b *SystemBackend) namespacePaths() []*framework.Path {
 
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: "namespaces",
-				//OperationSuffix: "api-namespace2", // ??? this endpoint duplicates /sys/namespaces/api-lock
+				// OperationSuffix: "api-namespace2", // ??? this endpoint duplicates /sys/namespaces/api-lock
 			},
 
 			Fields: map[string]*framework.FieldSchema{
@@ -294,7 +292,7 @@ type NamespaceEntry struct {
 // NewNamespaceStore creates a new NamespaceStore that is backed
 // using a given view. It used used to durable store and manage named namespace.
 func NewNamespaceStore(ctx context.Context, core *Core, baseView *BarrierView, system logical.SystemView, logger log.Logger) (*NamespaceStore, error) {
-	//xlog.Printf("core Store: %#v", core)
+	// xlog.Printf("core Store: %#v", core)
 	ps := &NamespaceStore{
 		aclView:    baseView.SubView(namespaceSubPath),
 		modifyLock: new(sync.RWMutex),

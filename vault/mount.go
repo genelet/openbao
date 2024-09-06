@@ -579,7 +579,6 @@ func (c *Core) mount(ctx context.Context, entry *MountEntry) error {
 }
 
 func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStorage bool) error {
-
 	ms, err := c.ListMounts()
 	if err != nil {
 		panic("failed to list mounts")
