@@ -21,7 +21,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,14 +44,12 @@ var (
 // TDEngineBackend is a physical backend that stores data
 // within TDEngine database.
 type TDEngineBackend struct {
-	db            *sql.DB
-	database      string
-	sTable        string
-	namespaceID   string
-	namespacePath string
-	logger        log.Logger
-	permitPool    *physical.PermitPool
-	conf          map[string]string
+	db         *sql.DB
+	database   string
+	sTable     string
+	logger     log.Logger
+	permitPool *physical.PermitPool
+	conf       map[string]string
 }
 
 // NewTDEngineBackend constructs a TDEngine backend using the given API client and
@@ -95,6 +92,22 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (physical.Bac
 	if database == "" {
 		database = "openbao"
 	}
+
+	sTable := conf["stable"]
+	if sTable == "" {
+		sTable = "superbao"
+	}
+
+	// Setup the backend.
+	m := &TDEngineBackend{
+		db:         db,
+		database:   database,
+		sTable:     sTable,
+		logger:     logger,
+		permitPool: physical.NewPermitPool(maxParInt),
+		conf:       conf,
+	}
+
 	schemaRows, err := db.Query(`SELECT name FROM information_schema.ins_databases WHERE name = "` + database + `"`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check tdengine schema exist: %w", err)
@@ -102,111 +115,186 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (physical.Bac
 	defer schemaRows.Close()
 	schemaExist := schemaRows.Next()
 	if !schemaExist {
-		if _, err := db.Exec("CREATE DATABASE IF NOT EXISTS `" + database + "`"); err != nil {
+		if _, err = db.Exec("CREATE DATABASE IF NOT EXISTS `" + database + "`"); err != nil {
 			return nil, fmt.Errorf("failed to create tdengine database %s: %w", database, err)
 		}
 		logger.Debug("tdengine database created", "database", database)
 	}
 
-	sTable := conf["stable"]
-	if sTable == "" {
-		sTable = "superbao"
-	}
-	stableRows, err := db.Query(`SELECT stable_name FROM information_schema.ins_stables WHERE stable_name = "` + sTable + `" AND db_name = "` + database + `"`)
+	stableExist, err := m.existingStable(sTable)
 	if err != nil {
+		logger.Error("failed to check tdengine stable exist", "stable", sTable, "error", err)
 		return nil, fmt.Errorf("failed to check tdengine stable exist: %w", err)
-	}
-	defer stableRows.Close()
-	stableExist := stableRows.Next()
-	if !stableExist {
-		if _, err := db.Exec("CREATE STABLE IF NOT EXISTS " + sTable + " ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(64), NamespacePath VARCHAR(1024) )"); err != nil {
+	} else if !stableExist {
+		if _, err = db.Exec("CREATE STABLE IF NOT EXISTS " + sTable + " ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(64), NamespacePath VARCHAR(1024) )"); err != nil {
 			return nil, fmt.Errorf("failed to create tdengine stable %s: %w", sTable, err)
 		}
 		logger.Debug("tdengine stable created", "stable", sTable)
 	}
 
-	// Setup the backend.
-	m := &TDEngineBackend{
-		db:            db,
-		database:      database,
-		sTable:        sTable,
-		namespaceID:   namespace.RootNamespaceID,
-		namespacePath: "",
-		logger:        logger,
-		permitPool:    physical.NewPermitPool(maxParInt),
-		conf:          conf,
-	}
-
-	tableRows, err := db.Query(`SELECT table_name FROM information_schema.ins_tables WHERE table_name = "` + m.tablename() + `" AND stable_name = "` + sTable + `" AND db_name = "` + database + `"`)
+	tname := tablename(namespace.RootNamespace)
+	tableExist, err := m.existingTable(tname)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check tdengine root table exists: %w", err)
-	}
-	defer tableRows.Close()
-	tableExist := tableRows.Next()
-	if !tableExist {
-		err = m.CreateIfNotExists()
+		return nil, fmt.Errorf("failed to check tdengine root table exist: %w", err)
+	} else if !tableExist {
+		if _, err = m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + namespace.RootNamespace.ID + `", "" )`); err != nil {
+			return nil, fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
+		}
+		logger.Debug("tdengine root table created", "table", tname)
 	}
 
 	return m, err
 }
 
-// CreateIfNotExists creates the table if it does not exist.
-func (m *TDEngineBackend) CreateIfNotExists(ns ...*namespace.Namespace) error {
-	var id, p string
-	if ns != nil {
-		id = ns[0].ID
-		p = ns[0].Path
-		if m.namespaceID != "" {
-			p = path.Join(m.namespacePath, p)
-		}
-	} else {
-		id = m.namespaceID
-		p = m.namespacePath
+func quote(s string) string {
+	return strings.ReplaceAll(s, `;`, ``)
+}
+
+// tagname returns the table name for the current namespace.
+func tagname(ns *namespace.Namespace) string {
+	p := ns.Path
+	if p == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(p, "/") {
+		p = p[1:]
 	}
 	p = strings.ReplaceAll(p, "/", "_")
+	return quote(p)
+}
+
+// tablename returns the table name for the current namespace.
+func tablename(ns *namespace.Namespace) string {
+	tag := tagname(ns)
+	if tag == "" {
+		return ns.ID
+	}
+	return ns.ID + "_" + tag
+}
+
+func (m *TDEngineBackend) existingChildren(tname string) (bool, error) {
+	statement := `SELECT table_name from information_schema.ins_tables WHERE table_name LIKE "` + tname + `_%" AND db_name = "` + m.database + `"`
+	return m.existing(statement)
+}
+
+func (m *TDEngineBackend) existingTable(tname string) (bool, error) {
+	statement := `SELECT table_name FROM information_schema.ins_tables WHERE table_name = "` + tname + `" AND db_name = "` + m.database + `"`
+	return m.existing(statement)
+}
+
+func (m *TDEngineBackend) existingStable(tname string) (bool, error) {
+	statement := `SELECT stable_name FROM information_schema.ins_stables WHERE stable_name = "` + tname + `" AND db_name = "` + m.database + `"`
+	return m.existing(statement)
+}
+
+func (m *TDEngineBackend) existing(statement string) (bool, error) {
+	tableRows, err := m.db.Query(statement)
+	if err != nil {
+		return false, err
+	}
+	defer tableRows.Close()
+	return tableRows.Next(), nil
+}
+
+// CreateIfNotExists creates the table if it does not exist.
+func (m *TDEngineBackend) CreateIfNotExists(ctx context.Context, ns0, ns1 *namespace.Namespace) error {
+	var tname, parent, p string
+	parent = tablename(ns0)
+	id := ns0.ID
+	if id != ns1.ID {
+		return fmt.Errorf("invalid namespace id %s", ns1.ID)
+	}
+	if strings.Contains(ns1.Path, "_") {
+		return fmt.Errorf("invalid namespace path %s", ns1.Path)
+	}
+	tname = parent + "_" + ns1.Path
+	p = tname[len(id)+1:]
+
+	parentExist, err := m.existingTable(parent)
+	if err != nil {
+		m.logger.Error("failed to check tdengine parent table exist", "parent", parent, "error", err)
+		return fmt.Errorf("failed to check tdengine parent table exist: %w", err)
+	} else if !parentExist {
+		m.logger.Error("parent namespace not found", "parent", parent)
+		return fmt.Errorf("parent namespace not found")
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 
 	// Create the table if it does not exist.
-	_, err := m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + m.tablename(ns...) + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + p + `" )`)
+	statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + p + `" )`
+	_, err = m.db.Exec(statement)
 	if err != nil {
-		m.logger.Error("failed to create tdengine table", "table", m.tablename(ns...), "error", err)
-		return fmt.Errorf("failed to create tdengine table %s: %w", m.tablename(ns...), err)
+		m.logger.Error("failed to create tdengine table", "table", tname, "error", err)
+		return fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
 	}
-	m.logger.Debug("tdengine table created", "table", m.tablename(ns...))
+
+	m.logger.Debug("tdengine table created", "table", tname)
 	return nil
 }
 
 // DropIfExists drop the table if it exists.
-func (m *TDEngineBackend) DropIfExists(ns *namespace.Namespace) error {
-	_, err := m.db.Exec("DROP TABLE IF EXISTS " + m.database + "." + m.tablename(ns))
+func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns0, ns1 *namespace.Namespace) error {
+	parent := tablename(ns0)
+	tableExist, err := m.existingTable(parent)
 	if err != nil {
-		m.logger.Error("failed to drop tdengine table", "table", m.tablename(ns), "error", err)
-		return fmt.Errorf("failed to drop tdengine table %s: %w", m.tablename(ns), err)
+		m.logger.Error("failed to check tdengine parent table exist", "parent", parent, "error", err)
+		return fmt.Errorf("failed to check tdengine parent table exist: %w", err)
+	} else if !tableExist {
+		m.logger.Error("parent namespace not found", "parent", parent)
+		return fmt.Errorf("parent namespace not found %s", parent)
 	}
-	m.logger.Debug("tdengine table dropped", "table", m.tablename(ns))
+
+	if ns0.ID != ns1.ID {
+		return fmt.Errorf("invalid namespace id %s", ns1.ID)
+	}
+	if strings.Contains(ns1.Path, "_") {
+		return fmt.Errorf("invalid namespace path %s", ns1.Path)
+	}
+
+	tname := parent + "_" + ns1.Path
+	tagExist, err := m.existingChildren(tname)
+	if err != nil {
+		m.logger.Error("failed to check tdengine children exist", "table", tname, "error", err)
+		return fmt.Errorf("failed to check tdengine children exist: %w", err)
+	} else if tagExist {
+		m.logger.Error("children namespace found", "table", tname)
+		return fmt.Errorf("children namespace found %s", tname)
+	}
+
+	tableExist, err = m.existingTable(tname)
+	if err != nil {
+		m.logger.Error("failed to check tdengine table exist", "table", tname, "error", err)
+		return fmt.Errorf("failed to check tdengine table exist: %w", err)
+	} else if !tableExist {
+		m.logger.Error("table not found", "table", tname)
+		return fmt.Errorf("table not found %s", tname)
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	statement := "DROP TABLE IF EXISTS " + m.database + "." + tname
+	_, err = m.db.Exec(statement)
+	if err != nil {
+		m.logger.Error("failed to drop tdengine table", "table", tname, "statement", statement, "error", err)
+		return fmt.Errorf("failed to drop tdengine table %w", err)
+	}
+
+	m.logger.Debug("tdengine table dropped", "table", tname)
 	return nil
 }
 
-// tablename returns the table name for the current namespace.
-func (m *TDEngineBackend) tablename(ns ...*namespace.Namespace) string {
-	var id, p string
-	if ns != nil {
-		id = ns[0].ID
-		p = ns[0].Path
-		if m.namespaceID != "" {
-			p = path.Join(m.namespacePath, p)
-			m.logger.Debug("tdengine table name", "first", m.namespacePath, "second", ns[0], "path", p)
-		}
-	} else {
-		id = m.namespaceID
-		p = m.namespacePath
-	}
-	p = strings.ReplaceAll(p, "/", "_")
-	m.logger.Debug("tdengine table name", "id", id, "path", p)
-	return id + "_" + p
-}
-
-// Set the namespace.
-func (m *TDEngineBackend) setNamespace(ctx context.Context) (string, error) {
+// get table name from context namespace.
+func (m *TDEngineBackend) getTablename(ctx context.Context) (string, error) {
 	ns, err := namespace.FromContext(ctx)
 	if err != nil && err == namespace.ErrNoNamespace {
 		ns = &namespace.Namespace{
@@ -217,31 +305,7 @@ func (m *TDEngineBackend) setNamespace(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("namespace in ctx error: %w", err)
 	}
 
-	m.namespaceID = ns.ID
-	m.namespacePath = ns.Path
-	return m.database + `.` + m.tablename(), nil
-}
-
-// Put is used to insert or update an entry.
-func (m *TDEngineBackend) Put(ctx context.Context, entry *physical.Entry) error {
-	defer metrics.MeasureSince([]string{"tdengine", "put"}, time.Now())
-
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
-
-	tname, err := m.setNamespace(ctx)
-	if err != nil {
-		return err
-	}
-
-	statement := fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, entry.Key, entry.Value)
-	_, err = m.db.ExecContext(ctx, statement)
-	if err != nil {
-		m.logger.Error("failed to insert", "table", tname, "error", err)
-		return fmt.Errorf("failed to insert %w", err)
-	}
-	m.logger.Debug("tdengine put", "table", tname, "key", entry.Key)
-	return nil
+	return m.database + `.` + tablename(ns), nil
 }
 
 // Get is used to fetch an entry.
@@ -251,19 +315,28 @@ func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry,
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
 
-	tname, err := m.setNamespace(ctx)
+	tname, err := m.getTablename(ctx)
 	if err != nil {
+		m.logger.Error("failed to set namespace", "error", err)
 		return nil, err
 	}
 
-	statement := `SELECT v FROM ` + tname + ` WHERE k="` + key + `"`
+	statement := `SELECT v FROM ` + tname + ` WHERE k="` + key + `" ORDER BY ts DESC LIMIT 1`
 	var result []byte
 	err = m.db.QueryRowContext(ctx, statement).Scan(&result)
 	if err == sql.ErrNoRows {
+		m.logger.Debug("tdengine get", "table", tname, "key", key, "record", "not found")
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to query %w", err)
 	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	m.logger.Debug("tdengine get", "table", tname, "key", key)
 
 	return &physical.Entry{
@@ -272,22 +345,32 @@ func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry,
 	}, nil
 }
 
-// Delete is used to permanently delete an entry
-func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
-	defer metrics.MeasureSince([]string{"tdengine", "delete"}, time.Now())
+// Put is used to insert or update an entry.
+func (m *TDEngineBackend) Put(ctx context.Context, entry *physical.Entry) error {
+	defer metrics.MeasureSince([]string{"tdengine", "put"}, time.Now())
 
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
 
-	tname, err := m.setNamespace(ctx)
+	tname, err := m.getTablename(ctx)
 	if err != nil {
 		return err
 	}
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	key := entry.Key
 	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + key + `"`
 	rows, err := m.db.QueryContext(ctx, statement)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("key %s not found", key)
+		statement := fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
+		_, err = m.db.ExecContext(ctx, statement)
+		m.logger.Debug("tdengine put", "table", tname, "key", key, "possible error", err)
+		return err
 	} else if err != nil {
 		return fmt.Errorf("failed to query %w", err)
 	}
@@ -300,14 +383,70 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 		if err != nil {
 			return fmt.Errorf("failed to scan ts %w", err)
 		}
-		s := strings.Split(fmt.Sprintf("%s", ts), " ")
-		arr = append(arr, strings.Join(s[:2], " "))
+		arr = append(arr, fmt.Sprintf("%s", ts))
 	}
-	statement = `DELETE FROM ` + tname + ` WHERE ts = "` + strings.Join(arr, `","`) + `"`
+
+	statement = fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
 	_, err = m.db.ExecContext(ctx, statement)
 	if err != nil {
-		return fmt.Errorf("failed to delete %w", err)
+		m.logger.Error("failed to insert", "table", tname, "error", err)
+		return fmt.Errorf("failed to insert %w", err)
 	}
+
+	for _, ts := range arr {
+		s := strings.Split(ts, " ")
+		_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
+		if err != nil {
+			m.logger.Error("failed to delete old", "statement", statement, "ts", ts, "error", err)
+			return fmt.Errorf("failed to delete %w in update", err)
+		}
+	}
+
+	m.logger.Debug("tdengine put", "table", tname, "key", key)
+	return nil
+}
+
+// Delete is used to permanently delete an entry
+func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
+	defer metrics.MeasureSince([]string{"tdengine", "delete"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + key + `"`
+	rows, err := m.db.QueryContext(ctx, statement)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("key %s not found", key)
+	} else if err != nil {
+		return fmt.Errorf("failed to query %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ts time.Time
+		err = rows.Scan(&ts)
+		if err != nil {
+			return fmt.Errorf("failed to scan ts %w", err)
+		}
+		s := strings.Split(fmt.Sprintf("%s", ts), " ")
+		_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
+		if err != nil {
+			m.logger.Error("failed to delete", "statement", statement, "key", key, "error", err)
+			return fmt.Errorf("failed to delete %w", err)
+		}
+	}
+
 	m.logger.Debug("tdengine delete", "table", tname, "key", key)
 
 	return nil
@@ -321,7 +460,7 @@ func (m *TDEngineBackend) List(ctx context.Context, prefix string) ([]string, er
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
 
-	tname, err := m.setNamespace(ctx)
+	tname, err := m.getTablename(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +472,7 @@ func (m *TDEngineBackend) List(ctx context.Context, prefix string) ([]string, er
 	}
 	rows, err := m.db.QueryContext(ctx, statement)
 	if err != nil {
+		m.logger.Error("failed to list", "table", tname, "statement", statement, "error", err)
 		return nil, fmt.Errorf("failed to list %w", err)
 	}
 	defer rows.Close()
@@ -354,7 +494,13 @@ func (m *TDEngineBackend) List(ctx context.Context, prefix string) ([]string, er
 			keys = strutil.AppendIfMissing(keys, string(key[:i+1]))
 		}
 	}
-	m.logger.Debug("tdengine list", "table", tname, "prefix", prefix)
+	m.logger.Debug("tdengine list", "table", tname, "prefix", prefix, "keys", keys)
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	sort.Strings(keys)
 	return keys, nil
@@ -366,7 +512,7 @@ func (m *TDEngineBackend) ListPage(ctx context.Context, prefix string, after str
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
 
-	tname, err := m.setNamespace(ctx)
+	tname, err := m.getTablename(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +558,13 @@ func (m *TDEngineBackend) ListPage(ctx context.Context, prefix string, after str
 		}
 		n++
 	}
-	m.logger.Debug("tdengine list_page", "table", tname, "prefix", prefix, "after", after, "limit", limit)
+	m.logger.Debug("tdengine list_page", "table", tname, "prefix", prefix, "after", after, "limit", limit, "keys", keys)
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	return keys, nil
 }

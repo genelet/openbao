@@ -363,7 +363,7 @@ func (ps *NamespaceStore) SetNamespace(ctx context.Context, path string, meta ma
 	if !ok {
 		return fmt.Errorf("failed to get tdengine backend")
 	}
-	err = td.CreateIfNotExists(newNS)
+	err = td.CreateIfNotExists(ctx, ns, newNS)
 	if err != nil {
 		return fmt.Errorf("failed to create namespace table for %s: %w", path, err)
 	}
@@ -454,13 +454,13 @@ func (ps *NamespaceStore) DeleteNamespace(ctx context.Context, path string) erro
 		return fmt.Errorf("cannot delete %q namespace", path)
 	}
 
+	err = td.DropIfExists(ctx, ns, newNS)
+	if err != nil {
+		return fmt.Errorf("failed to drop namespace table for %s: %w", path, err)
+	}
 	err = view.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete namespace: %w", err)
-	}
-	err = td.DropIfExists(newNS)
-	if err != nil {
-		return fmt.Errorf("failed to drop namespace table for %s: %w", path, err)
 	}
 
 	return nil

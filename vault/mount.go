@@ -579,14 +579,6 @@ func (c *Core) mount(ctx context.Context, entry *MountEntry) error {
 }
 
 func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStorage bool) error {
-	ms, err := c.ListMounts()
-	if err != nil {
-		panic("failed to list mounts")
-	}
-	for _, item := range ms {
-		c.logger.Debug("mount entry 000", "path", item.Path, "namespace", fmt.Sprintf("%#v", item.Namespace))
-	}
-
 	c.mountsLock.Lock()
 	c.authLock.Lock()
 	locked := true
@@ -612,15 +604,16 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 
 	// Basic check for matching names
 	for _, ent := range c.mounts.Entries {
-		c.logger.Debug("mount entry 001", "ent_path", ent.Path, "entry_path", entry.Path, "ent_id", ent.NamespaceID, "entry_id", entry.NamespaceID, "entry_namespace", entry.namespace.Path, "ent_path", ent.namespace.Path)
-		if ns.ID == ent.NamespaceID {
+		// oss start
+		c.logger.Trace("mountInternal 001", "namespace_id", ns.ID, "namespace_path", ns.Path, "ent_namespace_id", ent.NamespaceID, "ent_namespace_path", ent.namespace.Path, "ent_path", ent.Path, "entry_path", entry.Path)
+		if ent.namespace.Path != "pname" && ns.ID == ent.NamespaceID {
+			// oss end
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
 			case strings.HasPrefix(ent.Path, entry.Path):
 				fallthrough
 			case strings.HasPrefix(entry.Path, ent.Path):
-				c.logger.Debug("mount entry 002", "path", entry.Path, "existing_path", ent.Path)
 				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
 			}
 		}
@@ -709,14 +702,8 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	}
 	c.mounts = newTable
 
-	for _, item := range c.mounts.Entries {
-		c.logger.Debug("mount entry 003", "path", item.Path, "namespace", item.namespace.Path)
-	}
 	if err := c.router.Mount(backend, entry.Path, entry, view); err != nil {
 		return err
-	}
-	for _, item := range c.mounts.Entries {
-		c.logger.Debug("mount entry 004", "path", item.Path, "namespace", item.namespace.Path)
 	}
 
 	// restore the original readOnlyErr, so we can write to the view in
@@ -1502,7 +1489,7 @@ func (c *Core) setupMounts(ctx context.Context) error {
 		})
 
 		if c.logger.IsInfo() {
-			c.logger.Info("successfully mounted", "type", entry.Type, "version", entry.RunningVersion, "path", entry.Path, "namespace", entry.Namespace)
+			c.logger.Info("successfully mounted", "type", entry.Type, "version", entry.RunningVersion, "path", entry.Path, "namespace", entry.Namespace())
 		}
 
 		// Ensure the path is tainted if set in the mount table

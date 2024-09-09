@@ -6,7 +6,6 @@ package vault
 import (
 	"context"
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -171,10 +170,8 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	r.l.Lock()
 	defer r.l.Unlock()
 
-	r.logger.Trace("Mounting 001", "prefix", prefix, "mountEntry", fmt.Sprintf("%v", mountEntry.Namespace()))
 	// prepend namespace
 	prefix = mountEntry.Namespace().Path + prefix
-	r.logger.Trace("Mounting 002", "prefix", prefix, "storageviewPrefix", storageView.Prefix())
 
 	// Check if this is a nested mount
 	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
@@ -216,7 +213,6 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 		return fmt.Errorf("missing mount accessor; mount_path: %q, mount_type: %q", re.mountEntry.Path, re.mountEntry.Type)
 	}
 
-	r.logger.Trace("Routing Insert 001", "item", prefix)
 	r.root.Insert(prefix, re)
 	r.storagePrefix.Insert(re.storagePrefix, re)
 	r.mountUUIDCache.Insert(re.mountEntry.UUID, re.mountEntry)
@@ -275,10 +271,8 @@ func (r *Router) Remount(ctx context.Context, src, dst string) error {
 		return fmt.Errorf("no mount at %q", src)
 	}
 
-	r.logger.Trace("Routing Delete 001", "item", src)
 	// Update the mount point
 	r.root.Delete(src)
-	r.logger.Trace("Routing Insert 002", "item", dst)
 	r.root.Insert(dst, raw)
 	return nil
 }
@@ -555,7 +549,6 @@ func (r *Router) matchingMountEntryByPath(ctx context.Context, path string, apiP
 
 // Route is used to route a given request
 func (r *Router) Route(ctx context.Context, req *logical.Request) (*logical.Response, error) {
-	r.logger.Trace("Routing request", "0000", req.Path)
 	resp, _, _, err := r.routeCommon(ctx, req, false)
 	return resp, err
 }
@@ -572,27 +565,31 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		return nil, false, false, err
 	}
 
-	r.logger.Trace("Routing request", "1111", fmt.Sprintf("%#v", r.root.ToMap()))
+	for k, v := range r.root.ToMap() {
+		r.logger.Trace("Router routeCommon 001", "k", k, "v", fmt.Sprintf("%T", v), "namespace_id", ns.ID, "namespace_path", ns.Path)
+	}
 	// Find the mount point
 	r.l.RLock()
 	adjustedPath := req.Path
 	// oss start
-	// mount, raw, ok := r.root.LongestPrefix(adjustedPath)
+	mount, raw, ok := r.root.LongestPrefix(adjustedPath)
+	// mount, raw, ok := r.root.LongestPrefix(ns.Path + adjustedPath)
 	// oss end
-	mount, raw, ok := r.root.LongestPrefix(path.Join(ns.Path, adjustedPath))
-	r.logger.Trace("Routing request 1000", "join", path.Join(ns.Path, adjustedPath), "ns.Path", ns.Path, "reqPath", req.Path, "mount", mount, "ok", ok)
 	if !ok && !strings.HasSuffix(adjustedPath, "/") {
 		// Re-check for a backend by appending a slash. This lets "foo" mean
 		// "foo/" at the root level which is almost always what we want.
 		adjustedPath += "/"
-		mount, raw, ok = r.root.LongestPrefix(path.Join(ns.Path, adjustedPath))
+		// oss start
+		mount, raw, ok = r.root.LongestPrefix(adjustedPath)
+		// mount, raw, ok = r.root.LongestPrefix(ns.Path + adjustedPath)
+		// oss end
 	}
 	r.l.RUnlock()
 	if !ok {
-		r.logger.Trace("Routing request", "1111 not found", path.Join(ns.Path, adjustedPath))
+		r.logger.Trace("Router routeCommon 003 error", "ns.path", adjustedPath, "mount", mount, "ok", ok)
 		return logical.ErrorResponse(fmt.Sprintf("no handler for route %q. route entry not found.", req.Path)), false, false, logical.ErrUnsupportedPath
 	}
-	r.logger.Trace("Routing request", "2222", req.Path)
+	r.logger.Trace("Router routeCommon 004", "ns.path", adjustedPath, "mount", mount, "ok", ok)
 	req.Path = adjustedPath
 	if !existenceCheck {
 		defer metrics.MeasureSince([]string{
@@ -602,7 +599,6 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 	}
 	re := raw.(*routeEntry)
 
-	r.logger.Trace("Routing request", "3333", req.Path)
 	// Grab a read lock on the route entry, this protects against the backend
 	// being reloaded during a request. The exception is a renew request on the
 	// token store; such a request will have already been routed through the
@@ -618,11 +614,9 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		return logical.ErrorResponse(fmt.Sprintf("no handler for route %q. route entry found, but backend is nil.", req.Path)), false, false, logical.ErrUnsupportedPath
 	}
 
-	r.logger.Trace("Routing request", "4444", req.Path)
 	// If the path is tainted, we reject any operation except for
 	// Rollback and Revoke
 	if re.tainted {
-		r.logger.Trace("Routing request", "5555", req.Path)
 		switch req.Operation {
 		case logical.RevokeOperation, logical.RollbackOperation:
 		default:
@@ -630,13 +624,12 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		}
 	}
 
-	r.logger.Trace("Routing request", "6666", req.Path)
 	// Adjust the path to exclude the routing prefix
 	originalPath := req.Path
 	// oss start
-	// req.Path = strings.TrimPrefix(req.Path, mount)
+	req.Path = strings.TrimPrefix(req.Path, mount)
+	// req.Path = strings.TrimPrefix(ns.Path+req.Path, mount)
 	// oss end
-	req.Path = strings.TrimPrefix(ns.Path+req.Path, mount)
 	req.MountPoint = mount
 	req.MountType = re.mountEntry.Type
 	req.SetMountRunningSha256(re.mountEntry.RunningSha256)
@@ -653,7 +646,6 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 
 	originalEntityID := req.EntityID
 
-	r.logger.Trace("Routing request", "7777", req.Path)
 	// Hash the request token unless the request is being routed to the token
 	// or system backend.
 	clientToken := req.ClientToken
@@ -724,7 +716,6 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 	// request during token creation isn't sent to backends
 	req.InboundSSCToken = ""
 
-	r.logger.Trace("Routing request", "8888", req.Path)
 	// Filter and add passthrough headers to the backend
 	var passthroughRequestHeaders []string
 	if rawVal, ok := re.mountEntry.synthesizedConfigCache.Load("passthrough_request_headers"); ok {
@@ -749,14 +740,12 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		}
 	}
 
-	r.logger.Trace("Routing request", "9999", err)
 	originalPolicyOverride := req.PolicyOverride
 	reqTokenEntry := req.TokenEntry()
 	req.SetTokenEntry(nil)
 
 	// Reset the request before returning
 	defer func() {
-		r.logger.Trace("Routing request", "1010 start", req.Path, "original path", originalPath)
 		req.Path = originalPath
 		req.MountPoint = mount
 		req.MountType = re.mountEntry.Type
@@ -790,21 +779,14 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		}
 
 		req.SetTokenEntry(reqTokenEntry)
-		r.logger.Trace("Routing request", "1010 end", req.Path, "original path", originalPath)
 	}()
 
-	r.logger.Trace("Routing request", "1111", err)
 	// Invoke the backend
 	if existenceCheck {
-		r.logger.Trace("Routing request", "1112", req.Path)
 		ok, exists, err := re.backend.HandleExistenceCheck(ctx, req)
 		return nil, ok, exists, err
 	} else {
-		n, _ := namespace.FromContext(ctx)
-		r.logger.Trace("Routing request", "1212", req.Path, "operation", req.Operation, "id", n.ID, "path", n.Path)
-		r.logger.Trace("Routing request", "1212 re.backend", fmt.Sprintf("%T", re.backend))
 		resp, err := re.backend.HandleRequest(ctx, req)
-		r.logger.Trace("Routing request", "1313", err)
 		if resp != nil {
 			if len(allowedResponseHeaders) > 0 {
 				resp.Headers = filteredHeaders(resp.Headers, allowedResponseHeaders, nil)
@@ -860,7 +842,6 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 			}
 		}
 
-		r.logger.Trace("Routing request", "1414", err)
 		return resp, false, false, err
 	}
 }

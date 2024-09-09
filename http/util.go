@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -93,6 +92,9 @@ var (
 			}
 		}
 
+		namespace.RootNamespace.ID = namespace.RootNamespaceID
+		namespace.RootNamespace.Path = ""
+
 		ns := r.Header.Get(consts.NamespaceHeaderName)
 		if ns != "" {
 			if ns[0] == '/' {
@@ -104,11 +106,10 @@ var (
 			}
 			nsObject.Path = ns
 			r.WithContext(namespace.ContextWithNamespace(r.Context(), nsObject))
-
-			u.Path = "/v1/" + path.Join(ns, p)
-			r.URL = u
+		} else {
+			r = r.WithContext(namespace.ContextWithNamespace(r.Context(), namespace.RootNamespace))
 		}
-		c.Logger().Debug("adjustRequest AAAAAAAA", "url", r.URL.String())
+
 		return r, 0
 	}
 

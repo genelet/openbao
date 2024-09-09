@@ -686,33 +686,28 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		return nil, errwrap.Wrapf("could not parse namespace from http context: {{err}}", err)
 	}
 
-	c.logger.Trace("handling request a00", "req", req.Path, "namespace_id", ns.ID, "namespace_path", ns.Path)
-	//	c.SetupNamespaceStore(ctx)
 	if ns.Path != "" {
-		//	return nil, logical.CodedError(403, "namespaces feature not enabled")
+		// oss start
+		// return nil, logical.CodedError(403, "namespaces feature not enabled")
+		// oss end
 	}
 
 	var auth *logical.Auth
 	if c.isLoginRequest(ctx, req) {
-		c.logger.Trace("handling login a01", "req", req.Path)
 		resp, auth, err = c.handleLoginRequest(ctx, req)
 	} else {
-		c.logger.Trace("handling non-login a02", "req", req.Path)
 		resp, auth, err = c.handleRequest(ctx, req)
 	}
 
 	// oss start
-	if err != nil {
-		c.logger.Trace("handling request a03", "error", err)
-		return nil, err
-	}
+	// if err != nil {
+	// 	return nil, err
+	// }
 	// oss end
 
 	if err == nil && c.requestResponseCallback != nil {
-		c.logger.Trace("handling request response a04", "req", req.Path)
 		c.requestResponseCallback(c.router.MatchingBackend(ctx, req.Path), req, resp)
 	}
-	c.logger.Trace("handling request response a05", "error", err)
 	// If we saved the token in the request, we should return it in the response
 	// data.
 	if resp != nil && resp.Data != nil {
@@ -842,7 +837,6 @@ func (c *Core) isLoginRequest(ctx context.Context, req *logical.Request) bool {
 func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp *logical.Response, retAuth *logical.Auth, retErr error) {
 	defer metrics.MeasureSince([]string{"core", "handle_request"}, time.Now())
 
-	c.logger.Trace("handling request", "aaaa", req.Path)
 	var nonHMACReqDataKeys []string
 	entry := c.router.MatchingMountEntry(ctx, req.Path)
 	if entry != nil {
@@ -859,7 +853,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		}
 	}
 
-	c.logger.Trace("handling request", "bbbb", req.Path)
 	ns, err := namespace.FromContext(ctx)
 	if err != nil {
 		c.logger.Error("failed to get namespace from context", "error", err)
@@ -867,7 +860,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		return
 	}
 
-	c.logger.Trace("handling request", "cccc", req.Path)
 	// Validate the token
 	auth, te, ctErr := c.CheckToken(ctx, req, false)
 	if ctErr == logical.ErrRelativePath {
@@ -877,7 +869,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		return nil, nil, ctErr
 	}
 
-	c.logger.Trace("handling request", "dddd", ctErr)
 	// Updating in-flight request data with client/entity ID
 	inFlightReqID, ok := ctx.Value(logical.CtxKeyInFlightRequestID{}).(string)
 	if ok && req.ClientID != "" {
@@ -888,7 +879,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 	// in the case of an error (assuming we can successfully look up; if we
 	// need to forward, we exit before now)
 	if te != nil {
-		c.logger.Trace("handling request", "eeee", ctErr)
 		// Attempt to use the token (decrement NumUses)
 		var err error
 		te, err = c.tokenStore.UseToken(ctx, te)
@@ -929,7 +919,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 	}
 
 	if ctErr != nil {
-		c.logger.Trace("handling request", "ffff", ctErr)
 		// If it is an internal error we return that, otherwise we
 		// return invalid request so that the status codes can be correct
 		switch {
@@ -978,10 +967,8 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		return nil, auth, retErr
 	}
 
-	c.logger.Trace("handling request", "gggg", retErr)
 	// Route the request
 	resp, routeErr := c.doRouting(ctx, req)
-	c.logger.Trace("handling request", "hhhh", routeErr)
 	if resp != nil {
 
 		// If wrapping is used, use the shortest between the request and response
@@ -1026,7 +1013,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		}
 	}
 
-	c.logger.Trace("handling request", "iiii", routeErr)
 	// If there is a secret, we must register it with the expiration manager.
 	// We exclude renewal of a lease, since it does not need to be re-registered
 	if resp != nil && resp.Secret != nil && !strings.HasPrefix(req.Path, "sys/renew") &&
@@ -1072,7 +1058,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 			}
 		}
 
-		c.logger.Trace("handling request", "jjjj", routeErr)
 		if registerLease {
 			sysView := c.router.MatchingSystemView(ctx, req.Path)
 			if sysView == nil {
@@ -1113,7 +1098,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		}
 	}
 
-	c.logger.Trace("handling request", "kkkk", routeErr)
 	// Only the token store is allowed to return an auth block, for any
 	// other request this is an internal error.
 	if resp != nil && resp.Auth != nil {
@@ -1197,7 +1181,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		resp.Auth.ExternalNamespacePolicies = identityPolicies
 	}
 
-	c.logger.Trace("handling request", "llll", routeErr)
 	if resp != nil &&
 		req.Path == "cubbyhole/response" &&
 		len(te.Policies) == 1 &&
@@ -1210,7 +1193,6 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		retErr = multierror.Append(retErr, routeErr)
 	}
 
-	c.logger.Trace("handling request", "mmmm", retErr)
 	return resp, auth, retErr
 }
 
