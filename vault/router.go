@@ -786,6 +786,10 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		ok, exists, err := re.backend.HandleExistenceCheck(ctx, req)
 		return nil, ok, exists, err
 	} else {
+		r.logger.Trace("Router routeCommon 005", "backend", fmt.Sprintf("%T", re.backend), "req", fmt.Sprintf("%+v", req))
+		if v, ok := re.backend.(*SystemBackend); ok {
+			r.logger.Trace("Router routeCommon 005.1", "backend", fmt.Sprintf("%T", v.Backend))
+		}
 		resp, err := re.backend.HandleRequest(ctx, req)
 		if resp != nil {
 			if len(allowedResponseHeaders) > 0 {
@@ -842,6 +846,7 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 			}
 		}
 
+		r.logger.Trace("Router routeCommon 006", "response", fmt.Sprintf("%+v", resp), "err", err)
 		return resp, false, false, err
 	}
 }

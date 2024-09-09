@@ -13,6 +13,10 @@ var NamespaceByID func(context.Context, string, *Core) (*namespace.Namespace, er
 
 func namespaceByID(ctx context.Context, nsID string, c *Core) (*namespace.Namespace, error) {
 	// oss start
+	if true {
+		return &namespace.Namespace{ID: namespace.RootNamespaceID}, nil
+	}
+	// oss end
 	ns, err := namespace.FromContext(ctx)
 	if err == nil {
 		return ns, nil
@@ -20,7 +24,6 @@ func namespaceByID(ctx context.Context, nsID string, c *Core) (*namespace.Namesp
 	if ns != nil && ns.ID == nsID {
 		return ns, nil
 	}
-	// oss end
 	if nsID == namespace.RootNamespaceID {
 		return namespace.RootNamespace, nil
 	}

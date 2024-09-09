@@ -948,6 +948,7 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 	}
 
 	for _, entry := range b.Core.mounts.Entries {
+		b.logger.Trace("mount table entry 001", "entry", entry.Namespace(), "ns", ns)
 		// Only show entries for current namespace
 		if entry.Namespace().Path != ns.Path {
 			continue

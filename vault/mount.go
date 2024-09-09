@@ -606,8 +606,8 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	for _, ent := range c.mounts.Entries {
 		// oss start
 		c.logger.Trace("mountInternal 001", "namespace_id", ns.ID, "namespace_path", ns.Path, "ent_namespace_id", ent.NamespaceID, "ent_namespace_path", ent.namespace.Path, "ent_path", ent.Path, "entry_path", entry.Path)
-		if ent.namespace.Path != "pname" && ns.ID == ent.NamespaceID {
-			// oss end
+		// oss end
+		if ns.ID == ent.NamespaceID {
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
