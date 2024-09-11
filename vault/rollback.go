@@ -16,7 +16,8 @@ import (
 	"github.com/gammazero/workerpool"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/api/v2"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
@@ -178,12 +179,14 @@ func (m *RollbackManager) triggerRollbacks() {
 		}
 
 		// When the mount is filtered, the backend will be nil
-		ctx := namespace.ContextWithNamespace(m.quitContext, e.namespace)
+		//ctx := namespace.ContextWithNamespace(m.quitContext, e.namespace)
+		ctx := context.Background()
 		backend := m.router.MatchingBackend(ctx, path)
 		if backend == nil {
 			continue
 		}
-		fullPath := e.namespace.Path + path
+		//fullPath := e.namespace.Path + path
+		fullPath := path
 
 		// Start a rollback if necessary
 		m.startOrLookupRollback(ctx, fullPath, true)
@@ -251,20 +254,21 @@ func (m *RollbackManager) attemptRollback(ctx context.Context, fullPath string, 
 	defer metrics.MeasureSince([]string{"rollback", "attempt", strings.ReplaceAll(fullPath, "/", "-")}, time.Now())
 	defer m.finishRollback(rs, err, fullPath, true)
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		m.logger.Error("rollback failed to derive namespace from context", "path", fullPath)
-		return err
-	}
-	if ns == nil {
-		m.logger.Error("rollback found no namespace", "path", fullPath)
-		return namespace.ErrNoNamespace
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	m.logger.Error("rollback failed to derive namespace from context", "path", fullPath)
+	//	return err
+	//}
+	//if ns == nil {
+	//	m.logger.Error("rollback found no namespace", "path", fullPath)
+	//	return namespace.ErrNoNamespace
+	//}
 
 	// Invoke a RollbackOperation
 	req := &logical.Request{
 		Operation: logical.RollbackOperation,
-		Path:      ns.TrimmedPath(fullPath),
+		//Path:      ns.TrimmedPath(fullPath),
+		Path: fullPath,
 	}
 
 	releaseLock := true
@@ -327,11 +331,12 @@ func (m *RollbackManager) attemptRollback(ctx context.Context, fullPath string, 
 // core's statelock held (write OR read). If an already inflight rollback is
 // happening this function will simply wait for it to complete
 func (m *RollbackManager) Rollback(ctx context.Context, path string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	fullPath := ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//fullPath := ns.Path + path
+	fullPath := path
 
 	// Check for an existing attempt or start one if none
 	rs := m.startOrLookupRollback(ctx, fullPath, false)

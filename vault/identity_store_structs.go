@@ -12,7 +12,8 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/metricsutil"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
@@ -66,11 +67,11 @@ type IdentityStore struct {
 	// oidcCache stores common response data as well as when the periodic func needs
 	// to run. This is conservatively managed, and most writes to the OIDC endpoints
 	// will invalidate the cache.
-	oidcCache *oidcCache
+	// oidcCache *oidcCache
 
 	// oidcAuthCodeCache stores OIDC authorization codes to be exchanged
 	// for an ID token during an authorization code flow.
-	oidcAuthCodeCache *oidcCache
+	// oidcAuthCodeCache *oidcCache
 
 	// logger is the server logger copied over from core
 	logger log.Logger
@@ -93,10 +94,10 @@ type IdentityStore struct {
 	// operated case insensitively
 	disableLowerCasedNames bool
 
-	router        *Router
-	redirectAddr  string
-	localNode     LocalNode
-	namespacer    Namespacer
+	router       *Router
+	redirectAddr string
+	localNode    LocalNode
+	//namespacer    Namespacer
 	metrics       metricsutil.Metrics
 	totpPersister TOTPPersister
 	groupUpdater  GroupUpdater
@@ -122,12 +123,12 @@ type LocalNode interface {
 
 var _ LocalNode = &Core{}
 
-type Namespacer interface {
-	NamespaceByID(context.Context, string) (*namespace.Namespace, error)
-	ListNamespaces(includePath bool) []*namespace.Namespace
-}
+//type Namespacer interface {
+//	NamespaceByID(context.Context, string) (*namespace.Namespace, error)
+//	ListNamespaces(includePath bool) []*namespace.Namespace
+//}
 
-var _ Namespacer = &Core{}
+//var _ Namespacer = &Core{}
 
 type TOTPPersister interface {
 	PersistTOTPKey(ctx context.Context, configID string, entityID string, key string) error

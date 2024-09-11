@@ -191,7 +191,7 @@ func (rf *requestForwardingHandler) Stop() error {
 }
 
 // Starts the listeners and servers necessary to handle forwarded requests
-func (c *Core) startForwarding(ctx context.Context) error {
+func (c *Core) startForwarding(_ context.Context) error {
 	c.logger.Debug("request forwarding setup function")
 	defer c.logger.Debug("leaving request forwarding setup function")
 

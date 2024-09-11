@@ -749,7 +749,7 @@ func (i *IdentityStore) pathEntityNameList() framework.OperationFunc {
 
 // handlePathEntityListCommon lists the IDs or names of all the valid entities
 // in the identity store
-func (i *IdentityStore) handlePathEntityListCommon(ctx context.Context, req *logical.Request, d *framework.FieldData, byID bool) (*logical.Response, error) {
+func (i *IdentityStore) handlePathEntityListCommon(ctx context.Context, _ *logical.Request, _ *framework.FieldData, byID bool) (*logical.Response, error) {
 	ns, err := namespace.FromContext(ctx)
 	if err != nil {
 		return nil, err

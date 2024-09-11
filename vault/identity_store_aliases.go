@@ -11,7 +11,8 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/helper/identity"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/custommetadata"
@@ -153,10 +154,10 @@ func (i *IdentityStore) handleAliasCreateUpdate() framework.OperationFunc {
 	return func(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 		var err error
 
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return nil, err
-		}
+		//ns, err := namespace.FromContext(ctx)
+		//if err != nil {
+		//	return nil, err
+		//}
 
 		// Get alias name, if any
 		name := d.Get("name").(string)
@@ -203,9 +204,9 @@ func (i *IdentityStore) handleAliasCreateUpdate() framework.OperationFunc {
 				if alias == nil {
 					return logical.ErrorResponse("invalid alias ID provided"), nil
 				}
-				if alias.NamespaceID != ns.ID {
-					return logical.ErrorResponse("cannot modify aliases across namespaces"), logical.ErrPermissionDenied
-				}
+				//if alias.NamespaceID != ns.ID {
+				//	return logical.ErrorResponse("cannot modify aliases across namespaces"), logical.ErrPermissionDenied
+				//}
 				if !customMetadataExists {
 					customMetadata = alias.CustomMetadata
 				}
@@ -242,17 +243,17 @@ func (i *IdentityStore) handleAliasCreateUpdate() framework.OperationFunc {
 		if mountEntry == nil {
 			return logical.ErrorResponse(fmt.Sprintf("invalid mount accessor %q", mountAccessor)), nil
 		}
-		if mountEntry.NamespaceID != ns.ID {
-			return logical.ErrorResponse("matching mount is in a different namespace than request"), logical.ErrPermissionDenied
-		}
+		//if mountEntry.NamespaceID != ns.ID {
+		//	return logical.ErrorResponse("matching mount is in a different namespace than request"), logical.ErrPermissionDenied
+		//}
 		alias, err := i.MemDBAliasByFactors(mountAccessor, name, false, false)
 		if err != nil {
 			return nil, err
 		}
 		if alias != nil {
-			if alias.NamespaceID != ns.ID {
-				return logical.ErrorResponse("cannot modify aliases across namespaces"), logical.ErrPermissionDenied
-			}
+			//if alias.NamespaceID != ns.ID {
+			//	return logical.ErrorResponse("cannot modify aliases across namespaces"), logical.ErrPermissionDenied
+			//}
 			return i.handleAliasUpdate(ctx, canonicalID, name, mountAccessor, alias, customMetadata)
 		}
 		// At this point we know it's a new creation request
@@ -261,10 +262,11 @@ func (i *IdentityStore) handleAliasCreateUpdate() framework.OperationFunc {
 }
 
 func (i *IdentityStore) handleAliasCreate(ctx context.Context, canonicalID, name, mountAccessor string, local bool, customMetadata map[string]string) (*logical.Response, error) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	var err error
 
 	var entity *identity.Entity
 	if canonicalID != "" {
@@ -275,9 +277,9 @@ func (i *IdentityStore) handleAliasCreate(ctx context.Context, canonicalID, name
 		if entity == nil {
 			return logical.ErrorResponse("invalid canonical ID"), nil
 		}
-		if entity.NamespaceID != ns.ID {
-			return logical.ErrorResponse("entity found with 'canonical_id' not in request namespace"), logical.ErrPermissionDenied
-		}
+		//if entity.NamespaceID != ns.ID {
+		//	return logical.ErrorResponse("entity found with 'canonical_id' not in request namespace"), logical.ErrPermissionDenied
+		//}
 	}
 
 	if entity == nil && local {
@@ -390,9 +392,9 @@ func (i *IdentityStore) handleAliasUpdate(ctx context.Context, canonicalID, name
 		if mountEntry == nil {
 			return logical.ErrorResponse(fmt.Sprintf("invalid mount accessor %q", mountAccessor)), nil
 		}
-		if mountEntry.NamespaceID != alias.NamespaceID {
-			return logical.ErrorResponse("given mount accessor is not in the same namespace as the existing alias"), logical.ErrPermissionDenied
-		}
+		//if mountEntry.NamespaceID != alias.NamespaceID {
+		//	return logical.ErrorResponse("given mount accessor is not in the same namespace as the existing alias"), logical.ErrPermissionDenied
+		//}
 
 		existingAlias, err := i.MemDBAliasByFactors(mountAccessor, name, false, false)
 		if err != nil {
@@ -518,18 +520,18 @@ func (i *IdentityStore) pathAliasIDRead() framework.OperationFunc {
 	}
 }
 
-func (i *IdentityStore) handleAliasReadCommon(ctx context.Context, alias *identity.Alias) (*logical.Response, error) {
+func (i *IdentityStore) handleAliasReadCommon(_ context.Context, alias *identity.Alias) (*logical.Response, error) {
 	if alias == nil {
 		return nil, nil
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if ns.ID != alias.NamespaceID {
-		return logical.ErrorResponse("alias and request are in different namespaces"), logical.ErrPermissionDenied
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if ns.ID != alias.NamespaceID {
+	//	return logical.ErrorResponse("alias and request are in different namespaces"), logical.ErrPermissionDenied
+	//}
 
 	respData := map[string]interface{}{}
 	respData["id"] = alias.ID
@@ -582,13 +584,13 @@ func (i *IdentityStore) pathAliasIDDelete() framework.OperationFunc {
 			return nil, nil
 		}
 
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if ns.ID != alias.NamespaceID {
-			return logical.ErrorResponse("request and alias are in different namespaces"), logical.ErrPermissionDenied
-		}
+		//ns, err := namespace.FromContext(ctx)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//if ns.ID != alias.NamespaceID {
+		//	return logical.ErrorResponse("request and alias are in different namespaces"), logical.ErrPermissionDenied
+		//}
 
 		// Fetch the associated entity
 		entity, err := i.MemDBEntityByAliasIDInTxn(txn, alias.ID, true)

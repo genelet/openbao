@@ -6,7 +6,6 @@ package vault
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -192,19 +191,22 @@ func NewPolicyStore(ctx context.Context, core *Core, baseView *BarrierView, syst
 		ps.egpLRU = cache
 	}
 
-	aclView := ps.getACLView(namespace.RootNamespace)
+	aclView := ps.getACLView()
 	keys, err := logical.CollectKeys(namespace.RootContext(ctx), aclView)
 	if err != nil {
 		ps.logger.Error("error collecting acl policy keys", "error", err)
 		return nil, err
 	}
+	ps.logger.Debug("policy_store NewPolicyStore new", "keys", keys)
 	for _, key := range keys {
-		index := ps.cacheKey(namespace.RootNamespace, ps.sanitizeName(key))
+		index := ps.sanitizeName(key)
+		ps.logger.Trace("policy_store NewPolicyStore 002", "index", index)
 		ps.policyTypeMap.Store(index, PolicyTypeACL)
 	}
 
 	// Special-case root; doesn't exist on disk but does need to be found
-	ps.policyTypeMap.Store(ps.cacheKey(namespace.RootNamespace, "root"), PolicyTypeACL)
+	ps.policyTypeMap.Store("root", PolicyTypeACL)
+	ps.logger.Trace("policy_store NewPolicyStore 003", "root", PolicyTypeACL)
 	return ps, nil
 }
 
@@ -241,15 +243,15 @@ func (c *Core) teardownPolicyStore() error {
 }
 
 func (ps *PolicyStore) invalidate(ctx context.Context, name string, policyType PolicyType) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		ps.logger.Error("unable to invalidate key, no namespace info passed", "key", name)
-		return
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	ps.logger.Error("unable to invalidate key, no namespace info passed", "key", name)
+	//	return
+	//}
 
 	// This may come with a prefixed "/" due to joining the file path
 	saneName := strings.TrimPrefix(name, "/")
-	index := ps.cacheKey(ns, saneName)
+	index := saneName
 
 	ps.modifyLock.Lock()
 	defer ps.modifyLock.Unlock()
@@ -307,7 +309,8 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 	defer ps.modifyLock.Unlock()
 
 	// Get the appropriate view based on policy type and namespace
-	view := ps.getBarrierView(p.namespace, p.Type)
+	//view := ps.getBarrierView(p.namespace, p.Type)
+	view := ps.getBarrierView()
 	if view == nil {
 		return fmt.Errorf("unable to get the barrier subview for policy type %q", p.Type)
 	}
@@ -324,7 +327,8 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 	}
 
 	// Construct the cache key
-	index := ps.cacheKey(p.namespace, p.Name)
+	//index := ps.cacheKey(p.namespace, p.Name)
+	index := p.Name
 
 	switch p.Type {
 	case PolicyTypeACL:
@@ -347,9 +351,10 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 // GetNonEGPPolicyType returns a policy's type.
 // It will return an error if the policy doesn't exist in the store or isn't
 // an ACL.
-func (ps *PolicyStore) GetNonEGPPolicyType(nsID string, name string) (*PolicyType, error) {
+func (ps *PolicyStore) GetNonEGPPolicyType(name string) (*PolicyType, error) {
 	sanitizedName := ps.sanitizeName(name)
-	index := path.Join(nsID, sanitizedName)
+	//index := path.Join(nsID, sanitizedName)
+	index := sanitizedName
 
 	pt, ok := ps.policyTypeMap.Load(index)
 	if !ok {
@@ -367,6 +372,7 @@ func (ps *PolicyStore) GetNonEGPPolicyType(nsID string, name string) (*PolicyTyp
 
 // GetPolicy is used to fetch the named policy
 func (ps *PolicyStore) GetPolicy(ctx context.Context, name string, policyType PolicyType) (*Policy, error) {
+	ps.logger.Error("999999", "name", name)
 	return ps.switchedGetPolicy(ctx, name, policyType, true)
 }
 
@@ -379,7 +385,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	}
 	// Policies are normalized to lower-case
 	name = ps.sanitizeName(name)
-	index := ps.cacheKey(ns, name)
+	index := name
 
 	var cache *lru.TwoQueueCache
 	var view *BarrierView
@@ -387,7 +393,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	switch policyType {
 	case PolicyTypeACL:
 		cache = ps.tokenPoliciesLRU
-		view = ps.getACLView(ns)
+		view = ps.getACLView()
 	case PolicyTypeToken:
 		cache = ps.tokenPoliciesLRU
 		val, ok := ps.policyTypeMap.Load(index)
@@ -398,7 +404,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 		policyType = val.(PolicyType)
 		switch policyType {
 		case PolicyTypeACL:
-			view = ps.getACLView(ns)
+			view = ps.getACLView()
 		default:
 			return nil, fmt.Errorf("invalid type of policy in type map: %q", policyType)
 		}
@@ -414,8 +420,8 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	// Special case the root policy
 	if policyType == PolicyTypeACL && name == "root" && ns.ID == namespace.RootNamespaceID {
 		p := &Policy{
-			Name:      "root",
-			namespace: namespace.RootNamespace,
+			Name: "root",
+			//namespace: namespace.RootNamespace,
 		}
 		if cache != nil {
 			cache.Add(index, p)
@@ -462,11 +468,11 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	policy.Raw = policyEntry.Raw
 	policy.Type = policyEntry.Type
 	policy.Templated = policyEntry.Templated
-	policy.namespace = ns
+	//policy.namespace = ns
 	switch policyEntry.Type {
 	case PolicyTypeACL:
 		// Parse normally
-		p, err := ParseACLPolicy(ns, policyEntry.Raw)
+		p, err := ParseACLPolicy(policyEntry.Raw)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse policy: %w", err)
 		}
@@ -493,16 +499,17 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 func (ps *PolicyStore) ListPolicies(ctx context.Context, policyType PolicyType) ([]string, error) {
 	defer metrics.MeasureSince([]string{"policy", "list_policies"}, time.Now())
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if ns == nil {
-		return nil, namespace.ErrNoNamespace
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if ns == nil {
+	//	return nil, namespace.ErrNoNamespace
+	//}
+	var err error
 
 	// Get the appropriate view based on policy type and namespace
-	view := ps.getBarrierView(ns, policyType)
+	view := ps.getBarrierView()
 	if view == nil {
 		return []string{}, fmt.Errorf("unable to get the barrier subview for policy type %q", policyType)
 	}
@@ -553,10 +560,10 @@ func (ps *PolicyStore) deletePolicyForce(ctx context.Context, name string, polic
 func (ps *PolicyStore) switchedDeletePolicy(ctx context.Context, name string, policyType PolicyType, physicalDeletion, force bool) error {
 	defer metrics.MeasureSince([]string{"policy", "delete_policy"}, time.Now())
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
 	// If not set, the call comes from invalidation, where we'll already have
 	// grabbed the lock
 	if physicalDeletion {
@@ -566,9 +573,9 @@ func (ps *PolicyStore) switchedDeletePolicy(ctx context.Context, name string, po
 
 	// Policies are normalized to lower-case
 	name = ps.sanitizeName(name)
-	index := ps.cacheKey(ns, name)
+	index := name
 
-	view := ps.getBarrierView(ns, policyType)
+	view := ps.getBarrierView()
 	if view == nil {
 		return fmt.Errorf("unable to get the barrier subview for policy type %q", policyType)
 	}
@@ -608,16 +615,18 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 	var allPolicies []*Policy
 
 	// Fetch the named policies
-	for nsID, nsPolicyNames := range policyNames {
-		policyNS, err := NamespaceByID(ctx, nsID, ps.core)
-		if err != nil {
-			return nil, err
-		}
-		if policyNS == nil {
-			return nil, namespace.ErrNoNamespace
-		}
-		policyCtx := namespace.ContextWithNamespace(ctx, policyNS)
-		for _, nsPolicyName := range nsPolicyNames {
+	for _, nsPolicyNames := range policyNames {
+		//policyNS, err := NamespaceByID(ctx, nsID, ps.core)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//if policyNS == nil {
+		//	return nil, namespace.ErrNoNamespace
+		//}
+		//policyCtx := namespace.ContextWithNamespace(ctx, policyNS)
+		policyCtx := ctx
+		for k, nsPolicyName := range nsPolicyNames {
+			ps.logger.Trace("888888", "k", k, "name", nsPolicyName)
 			p, err := ps.GetPolicy(policyCtx, nsPolicyName, PolicyTypeToken)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get policy: %w", err)
@@ -638,6 +647,7 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 			if !fetchedGroups {
 				fetchedGroups = true
 				if entity != nil {
+					ps.logger.Trace("fetching groups for entity 80000", "entity", entity.ID)
 					directGroups, inheritedGroups, err := ps.core.identityStore.groupsByEntityID(entity.ID)
 					if err != nil {
 						return nil, fmt.Errorf("failed to fetch group memberships: %w", err)
@@ -645,7 +655,9 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 					groups = append(directGroups, inheritedGroups...)
 				}
 			}
-			p, err := parseACLPolicyWithTemplating(policy.namespace, policy.Raw, true, entity, groups)
+			ps.logger.Trace("parsing templated policy 80001", "policy", policy.Name, "entity", entity.ID, "groups", groups)
+			//p, err := parseACLPolicyWithTemplating(policy.namespace, policy.Raw, true, entity, groups)
+			p, err := parseACLPolicyWithTemplating(policy.Raw, true, entity, groups)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing templated policy %q: %w", policy.Name, err)
 			}
@@ -672,10 +684,10 @@ func (ps *PolicyStore) loadACLPolicy(ctx context.Context, policyName, policyText
 // loadACLPolicyInternal is used to load default ACL policies in a specific
 // namespace.
 func (ps *PolicyStore) loadACLPolicyInternal(ctx context.Context, policyName, policyText string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	// Check if the policy already exists
 	policy, err := ps.GetPolicy(ctx, policyName, PolicyTypeACL)
@@ -688,7 +700,7 @@ func (ps *PolicyStore) loadACLPolicyInternal(ctx context.Context, policyName, po
 		}
 	}
 
-	policy, err = ParseACLPolicy(ns, policyText)
+	policy, err = ParseACLPolicy(policyText)
 	if err != nil {
 		return fmt.Errorf("error parsing %s policy: %w", policyName, err)
 	}
@@ -706,6 +718,6 @@ func (ps *PolicyStore) sanitizeName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-func (ps *PolicyStore) cacheKey(ns *namespace.Namespace, name string) string {
-	return path.Join(ns.ID, name)
-}
+//func (ps *PolicyStore) cacheKey(ns *namespace.Namespace, name string) string {
+//	return path.Join(ns.ID, name)
+//}

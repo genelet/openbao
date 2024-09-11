@@ -3,6 +3,7 @@
 
 package vault
 
+/*
 import (
 	"context"
 
@@ -29,3 +30,4 @@ func namespaceByID(ctx context.Context, nsID string, c *Core) (*namespace.Namesp
 	}
 	return nil, namespace.ErrNoNamespace
 }
+*/

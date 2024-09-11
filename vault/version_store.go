@@ -155,7 +155,7 @@ func (c *Core) loadVersionHistory(ctx context.Context) error {
 // isMajorVersionFirstMount checks the current running version of Vault against
 // the newest version in the version store to see if this major version has
 // already been mounted.
-func (c *Core) isMajorVersionFirstMount(ctx context.Context) bool {
+func (c *Core) isMajorVersionFirstMount(_ context.Context) bool {
 	// Grab the most recent previous version from the version store
 	prevMounted, _, err := c.FindNewestVersionTimestamp()
 	if err != nil {

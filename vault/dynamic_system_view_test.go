@@ -208,7 +208,7 @@ func TestDynamicSystemView_GeneratePasswordFromPolicy_successful(t *testing.T) {
 	defer cancel()
 
 	ctx = namespace.RootContext(ctx)
-	dsv := TestDynamicSystemView(cluster.Cores[0].Core, nil)
+	dsv := TestDynamicSystemView(cluster.Cores[0].Core)
 
 	runeset := map[rune]bool{}
 	runesFound := []rune{}
@@ -278,7 +278,7 @@ func TestDynamicSystemView_GeneratePasswordFromPolicy_failed(t *testing.T) {
 			core := &Core{
 				systemBarrierView: NewBarrierView(testStorage, "sys/"),
 			}
-			dsv := TestDynamicSystemView(core, nil)
+			dsv := TestDynamicSystemView(core)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 			defer cancel()

@@ -16,7 +16,8 @@ import (
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/openbao/openbao/helper/metricsutil"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/certutil"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -110,21 +111,21 @@ func (c *Core) wrapInCubbyhole(ctx context.Context, req *logical.Request, resp *
 DONELISTHANDLING:
 	var err error
 	sealWrap := resp.WrapInfo.SealWrap
-
-	var ns *namespace.Namespace
-	// If we are creating a JWT wrapping token we always want them to live in
-	// the root namespace. These are only used for replication and plugin setup.
-	switch resp.WrapInfo.Format {
-	case "jwt":
-		ns = namespace.RootNamespace
-		ctx = namespace.ContextWithNamespace(ctx, ns)
-	default:
-		ns, err = namespace.FromContext(ctx)
-		if err != nil {
-			return nil, err
+	/*
+		var ns *namespace.Namespace
+		// If we are creating a JWT wrapping token we always want them to live in
+		// the root namespace. These are only used for replication and plugin setup.
+		switch resp.WrapInfo.Format {
+		case "jwt":
+			ns = namespace.RootNamespace
+			ctx = namespace.ContextWithNamespace(ctx, ns)
+		default:
+			ns, err = namespace.FromContext(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-
+	*/
 	// If we are wrapping, the first part (performed in this functions) happens
 	// before auditing so that resp.WrapInfo.Token can contain the HMAC'd
 	// wrapping token ID in the audit logs, so that it can be determined from
@@ -137,7 +138,7 @@ DONELISTHANDLING:
 		TTL:            resp.WrapInfo.TTL,
 		NumUses:        1,
 		ExplicitMaxTTL: resp.WrapInfo.TTL,
-		NamespaceID:    ns.ID,
+		//NamespaceID:    ns.ID,
 	}
 
 	if err := c.CreateToken(ctx, &te); err != nil {
@@ -147,20 +148,20 @@ DONELISTHANDLING:
 
 	// Count the successful token creation
 	ttl_label := metricsutil.TTLBucket(resp.WrapInfo.TTL)
-	mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
+	mountPointWithoutNs := req.MountPoint
 	c.metricSink.IncrCounterWithLabels(
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			metricsutil.NamespaceLabel(ns),
+			//metricsutil.NamespaceLabel(ns),
 			// The type of the secret engine is not all that useful;
 			// we could use "token" but let's be more descriptive,
 			// even if it's not a real auth method.
-			{"auth_method", "response_wrapping"},
-			{"mount_point", mountPointWithoutNs},
-			{"creation_ttl", ttl_label},
+			{Name: "auth_method", Value: "response_wrapping"},
+			{Name: "mount_point", Value: mountPointWithoutNs},
+			{Name: "creation_ttl", Value: ttl_label},
 			// *Should* be service, but let's use whatever create() did..
-			{"token_type", te.Type.String()},
+			{Name: "token_type", Value: te.Type.String()},
 		},
 	)
 

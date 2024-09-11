@@ -996,9 +996,9 @@ func (c *Core) JoinRaftCluster(ctx context.Context, leaderInfos []*raft.LeaderJo
 			}
 			expandedJoinInfos = append(expandedJoinInfos, joinInfos...)
 		}
-		if err != nil {
-			return err
-		}
+		//if err != nil {
+		//	return err
+		//}
 		var wg sync.WaitGroup
 		for i := range expandedJoinInfos {
 			wg.Add(1)

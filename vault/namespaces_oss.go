@@ -20,9 +20,9 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-func (c *Core) NamespaceByID(ctx context.Context, nsID string) (*namespace.Namespace, error) {
-	return namespaceByID(ctx, nsID, c)
-}
+//func (c *Core) NamespaceByID(ctx context.Context, nsID string) (*namespace.Namespace, error) {
+//	return namespaceByID(ctx, nsID, c)
+//}
 
 func (c *Core) ListNamespaces(includePath bool) []*namespace.Namespace {
 	return []*namespace.Namespace{namespace.RootNamespace}
@@ -323,7 +323,8 @@ func (c *Core) teardownNamespaceStore() error {
 	return nil
 }
 
-func (ps *NamespaceStore) invalidate(ctx context.Context, path string) {
+func (ps *NamespaceStore) invalidate(_ context.Context, _ string) {
+	ps = nil
 	return
 }
 

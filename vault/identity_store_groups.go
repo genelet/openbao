@@ -239,7 +239,7 @@ func (i *IdentityStore) pathGroupNameUpdate() framework.OperationFunc {
 	}
 }
 
-func (i *IdentityStore) handleGroupUpdateCommon(ctx context.Context, req *logical.Request, d *framework.FieldData, group *identity.Group) (*logical.Response, error) {
+func (i *IdentityStore) handleGroupUpdateCommon(ctx context.Context, _ *logical.Request, d *framework.FieldData, group *identity.Group) (*logical.Response, error) {
 	var newGroup bool
 	if group == nil {
 		group = new(identity.Group)
@@ -381,18 +381,18 @@ func (i *IdentityStore) pathGroupNameRead() framework.OperationFunc {
 	}
 }
 
-func (i *IdentityStore) handleGroupReadCommon(ctx context.Context, group *identity.Group) (*logical.Response, error) {
+func (i *IdentityStore) handleGroupReadCommon(_ context.Context, group *identity.Group) (*logical.Response, error) {
 	if group == nil {
 		return nil, nil
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if ns.ID != group.NamespaceID {
-		return logical.ErrorResponse("request namespace is not the same as the group namespace"), logical.ErrPermissionDenied
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if ns.ID != group.NamespaceID {
+	//	return logical.ErrorResponse("request namespace is not the same as the group namespace"), logical.ErrPermissionDenied
+	//}
 
 	respData := map[string]interface{}{}
 	respData["id"] = group.ID
@@ -491,13 +491,13 @@ func (i *IdentityStore) handleGroupDeleteCommon(ctx context.Context, key string,
 		return nil, nil
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if group.NamespaceID != ns.ID {
-		return logical.ErrorResponse("request namespace is not the same as the group namespace"), logical.ErrPermissionDenied
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if group.NamespaceID != ns.ID {
+	//	return logical.ErrorResponse("request namespace is not the same as the group namespace"), logical.ErrPermissionDenied
+	//}
 
 	// Delete group alias from memdb
 	if group.Type == groupTypeExternal && group.Alias != nil {
@@ -539,15 +539,16 @@ func (i *IdentityStore) pathGroupNameList() framework.OperationFunc {
 	}
 }
 
-func (i *IdentityStore) handleGroupListCommon(ctx context.Context, byID bool) (*logical.Response, error) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (i *IdentityStore) handleGroupListCommon(_ context.Context, byID bool) (*logical.Response, error) {
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	txn := i.db.Txn(false)
 
-	iter, err := txn.Get(groupsTable, "namespace_id", ns.ID)
+	//iter, err := txn.Get(groupsTable, "namespace_id", ns.ID)
+	iter, err := txn.Get(groupsTable, "namespace_id", namespace.RootNamespaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup groups using namespace ID: %w", err)
 	}

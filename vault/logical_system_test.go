@@ -507,7 +507,7 @@ func TestSystemBackend_PathCapabilities(t *testing.T) {
 
 	core, b, rootToken := testCoreSystemBackend(t)
 
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, capabilitiesPolicy)
+	policy, _ := ParseACLPolicy(capabilitiesPolicy)
 	err = core.policyStore.SetPolicy(namespace.RootContext(nil), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -716,7 +716,7 @@ func testCapabilities(t *testing.T, endpoint string) {
 		t.Fatalf("bad: got\n%#v\nexpected\n%#v\n", actual, expected)
 	}
 
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, capabilitiesPolicy)
+	policy, _ := ParseACLPolicy(capabilitiesPolicy)
 	err = core.policyStore.SetPolicy(namespace.RootContext(nil), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -772,7 +772,7 @@ func TestSystemBackend_CapabilitiesAccessor_BC(t *testing.T) {
 		t.Fatalf("bad: got\n%#v\nexpected\n%#v\n", actual, expected)
 	}
 
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, capabilitiesPolicy)
+	policy, _ := ParseACLPolicy(capabilitiesPolicy)
 	err = core.policyStore.SetPolicy(namespace.RootContext(nil), policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -3132,9 +3132,9 @@ func TestSystemBackend_rawDelete(t *testing.T) {
 
 	// set the policy!
 	p := &Policy{
-		Name:      "test",
-		Type:      PolicyTypeACL,
-		namespace: namespace.RootNamespace,
+		Name: "test",
+		Type: PolicyTypeACL,
+		//namespace: namespace.RootNamespace,
 	}
 	err := c.policyStore.SetPolicy(namespace.RootContext(nil), p)
 	if err != nil {

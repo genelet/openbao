@@ -123,7 +123,7 @@ func testConfig(t *testing.T, pluginCmd string) (*logical.BackendConfig, func())
 
 	core := cores[0]
 
-	sys := vault.TestDynamicSystemView(core.Core, nil)
+	sys := vault.TestDynamicSystemView(core.Core)
 
 	config := &logical.BackendConfig{
 		Logger: logging.NewVaultLogger(log.Debug),

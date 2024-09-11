@@ -5,6 +5,7 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/openbao/openbao/helper/namespace"
@@ -14,6 +15,7 @@ import (
 // Capabilities is used to fetch the capabilities of the given token on the
 // given path
 func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, error) {
+	c.Logger().Trace("666666666", "token", token, "path", path)
 	if path == "" {
 		return nil, &logical.StatusBadRequest{Err: "missing path"}
 	}
@@ -30,20 +32,27 @@ func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, 
 		return nil, &logical.StatusBadRequest{Err: "invalid token"}
 	}
 
-	tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
+	//tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if tokenNS == nil {
+	//	return nil, namespace.ErrNoNamespace
+	//}
+	// need namespace to for helper's identity entity
+	ns, err := namespace.FromContext(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if tokenNS == nil {
-		return nil, namespace.ErrNoNamespace
 	}
 
 	var policyCount int
 	policyNames := make(map[string][]string)
-	policyNames[tokenNS.ID] = te.Policies
+	//policyNames[tokenNS.ID] = te.Policies
+	policyNames[ns.ID] = te.Policies
 	policyCount += len(te.Policies)
 
-	entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
+	entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, te.EntityID, te.NoIdentityPolicies)
+	c.Logger().Trace("55555", "t-entry", fmt.Sprintf("%#v", te), "ident-entity", fmt.Sprintf("%#v", entity), "identityPolicies", fmt.Sprintf("%#v", identityPolicies))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +73,7 @@ func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, 
 	// Add capabilities of the inline policy if it's set
 	policies := make([]*Policy, 0)
 	if te.InlinePolicy != "" {
-		inlinePolicy, err := ParseACLPolicy(tokenNS, te.InlinePolicy)
+		inlinePolicy, err := ParseACLPolicy(te.InlinePolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +87,9 @@ func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, 
 
 	// Construct the corresponding ACL object. ACL construction should be
 	// performed on the token's namespace.
-	tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	//tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	tokenCtx := ctx
+	c.Logger().Trace("7777777777", "policyNames", policyNames, "policies", policies)
 	acl, err := c.policyStore.ACL(tokenCtx, entity, policyNames, policies...)
 	if err != nil {
 		return nil, err

@@ -312,8 +312,8 @@ func TestCore_EnableCredential_Local(t *testing.T) {
 				UUID:             "abcd",
 				Accessor:         "noop-abcd",
 				BackendAwareUUID: "abcde",
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 			{
 				Table:            credentialTableType,
@@ -322,8 +322,8 @@ func TestCore_EnableCredential_Local(t *testing.T) {
 				UUID:             "bcde",
 				Accessor:         "noop-bcde",
 				BackendAwareUUID: "bcdea",
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 		},
 	}
@@ -651,8 +651,8 @@ func TestCore_CredentialInitialize(t *testing.T) {
 					UUID:             "abcd",
 					Accessor:         "initable-abcd",
 					BackendAwareUUID: "abcde",
-					NamespaceID:      namespace.RootNamespaceID,
-					namespace:        namespace.RootNamespace,
+					//NamespaceID:      namespace.RootNamespaceID,
+					//namespace:        namespace.RootNamespace,
 				},
 			},
 		}
@@ -674,9 +674,9 @@ func TestCore_CredentialInitialize(t *testing.T) {
 }
 
 func remountCredentialFromRoot(c *Core, src, dst string, updateStorage bool) error {
-	srcPathDetails := c.splitNamespaceAndMountFromPath("", src)
-	dstPathDetails := c.splitNamespaceAndMountFromPath("", dst)
-	return c.remountCredential(namespace.RootContext(nil), srcPathDetails, dstPathDetails, updateStorage)
+	//srcPathDetails := c.splitNamespaceAndMountFromPath("", src)
+	//dstPathDetails := c.splitNamespaceAndMountFromPath("", dst)
+	return c.remountCredential(namespace.RootContext(nil), src, dst, updateStorage)
 }
 
 func TestCore_RemountCredential(t *testing.T) {

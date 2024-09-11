@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/openbao/openbao/helper/locking"
 	"github.com/openbao/openbao/helper/metricsutil"
-	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/pathmanager"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
@@ -1120,7 +1119,8 @@ func QuotaStoragePath(quotaType, name string) string {
 // HandleRemount updates the quota subsystem about the remount operation that
 // took place. Quota manager will trigger the quota specific updates including
 // the mount path update and the namespace update
-func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPathDetails) error {
+// func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPathDetails) error {
+func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error {
 	m.quotaLock.Lock()
 	m.dbAndCacheLock.RLock()
 	defer m.quotaLock.Unlock()
@@ -1132,15 +1132,15 @@ func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPat
 
 	// quota namespace would have been made non-empty during insertion. Use non-empty value
 	// during query as well.
-	fromNs := from.Namespace.Path
-	if fromNs == "" {
-		fromNs = namespace.RootNamespaceID
-	}
+	//fromNs := from.Namespace.Path
+	//if fromNs == "" {
+	//	fromNs = namespace.RootNamespaceID
+	//}
 
-	toNs := to.Namespace.Path
-	if toNs == "" {
-		toNs = namespace.RootNamespaceID
-	}
+	//toNs := to.Namespace.Path
+	//if toNs == "" {
+	//	toNs = namespace.RootNamespaceID
+	//}
 
 	updateMounts := func(idx string, args ...interface{}) error {
 		for _, quotaType := range quotaTypes() {
@@ -1153,7 +1153,7 @@ func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPat
 
 				// Clone the object and update it
 				clonedQuota := quota.Clone()
-				clonedQuota.handleRemount(to.MountPath, toNs)
+				clonedQuota.handleRemount(toNs, toNs)
 				// Update both underlying storage and memdb with the quota change
 				entry, err := logical.StorageEntryJSON(QuotaStoragePath(quotaType, quota.QuotaName()), quota)
 				if err != nil {
@@ -1171,19 +1171,19 @@ func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPat
 	}
 
 	// Update mounts for everything without a path prefix or role
-	err := updateMounts(indexNamespaceMount, fromNs, from.MountPath, false, false)
+	err := updateMounts(indexNamespaceMount, fromNs, fromNs, false, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a path prefix
-	err = updateMounts(indexNamespaceMount, fromNs, from.MountPath, true, false)
+	err = updateMounts(indexNamespaceMount, fromNs, fromNs, true, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a role
-	err = updateMounts(indexNamespaceMount, fromNs, from.MountPath, false, true)
+	err = updateMounts(indexNamespaceMount, fromNs, fromNs, false, true)
 	if err != nil {
 		return err
 	}
@@ -1196,7 +1196,8 @@ func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPat
 // HandleBackendDisabling updates the quota subsystem with the disabling of auth
 // or secret engine disabling. This should only be called on the primary cluster
 // node.
-func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath string) error {
+// func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath string) error {
+func (m *Manager) HandleBackendDisabling(ctx context.Context, mountPath string) error {
 	m.quotaLock.Lock()
 	m.dbAndCacheLock.RLock()
 	defer m.quotaLock.Unlock()
@@ -1207,9 +1208,9 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath 
 
 	// nsPath would have been made non-empty during insertion. Use non-empty value
 	// during query as well.
-	if nsPath == "" {
-		nsPath = "root"
-	}
+	//if nsPath == "" {
+	//	nsPath = "root"
+	//}
 
 	updateMounts := func(idx string, args ...interface{}) error {
 		for _, quotaType := range quotaTypes() {
@@ -1219,11 +1220,11 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath 
 			}
 			for raw := iter.Next(); raw != nil; raw = iter.Next() {
 				if err := txn.Delete(quotaType, raw); err != nil {
-					return fmt.Errorf("failed to delete quota from db after mount disabling; namespace %q, err %v", nsPath, err)
+					return fmt.Errorf("failed to delete quota from db after mount disabling;  err %v", err)
 				}
 				quota := raw.(Quota)
 				if err := m.storage.Delete(ctx, QuotaStoragePath(quotaType, quota.QuotaName())); err != nil {
-					return fmt.Errorf("failed to delete quota from storage after mount disabling; namespace %q, err %v", nsPath, err)
+					return fmt.Errorf("failed to delete quota from storage after mount disabling;  err %v", err)
 				}
 			}
 		}
@@ -1231,19 +1232,20 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath 
 	}
 
 	// Update mounts for everything without a path prefix or role
-	err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
+	//err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
+	err := updateMounts(indexNamespaceMount, mountPath, false, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a path prefix
-	err = updateMounts(indexNamespaceMount, nsPath, mountPath, true, false)
+	err = updateMounts(indexNamespaceMount, mountPath, true, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a role
-	err = updateMounts(indexNamespaceMount, nsPath, mountPath, false, true)
+	err = updateMounts(indexNamespaceMount, mountPath, false, true)
 	if err != nil {
 		return err
 	}

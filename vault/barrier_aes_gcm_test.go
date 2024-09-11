@@ -475,7 +475,8 @@ func TestEncrypt_Unique(t *testing.T) {
 		t.Fatalf("barrier is sealed")
 	}
 
-	entry := &logical.StorageEntry{Key: "test", Value: []byte("test")}
+	//entry := &logical.StorageEntry{Key: "test", Value: []byte("test")}
+	entry := &logical.StorageEntry{Value: []byte("test")}
 	term := b.keyring.ActiveTerm()
 	primary, _ := b.aeadForTerm(term)
 

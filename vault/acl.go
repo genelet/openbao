@@ -15,7 +15,8 @@ import (
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/mitchellh/copystructure"
 	"github.com/openbao/openbao/helper/identity"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
@@ -74,13 +75,13 @@ func NewACL(ctx context.Context, policies []*Policy) (*ACL, error) {
 		root:                 false,
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if ns == nil {
-		return nil, namespace.ErrNoNamespace
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if ns == nil {
+	//	return nil, namespace.ErrNoNamespace
+	//}
 
 	// Inject each policy
 	for _, policy := range policies {
@@ -97,9 +98,9 @@ func NewACL(ctx context.Context, policies []*Policy) (*ACL, error) {
 
 		// Check if this is root
 		if policy.Name == "root" {
-			if ns.ID != namespace.RootNamespaceID {
-				return nil, fmt.Errorf("root policy is only allowed in root namespace")
-			}
+			//if ns.ID != namespace.RootNamespaceID {
+			//	return nil, fmt.Errorf("root policy is only allowed in root namespace")
+			//}
 
 			if len(policies) != 1 {
 				return nil, fmt.Errorf("other policies present along with root")
@@ -338,11 +339,12 @@ func (a *ACL) AllowOperation(ctx context.Context, req *logical.Request, capCheck
 
 	var permissions *ACLPermissions
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return
-	}
-	path := ns.Path + req.Path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return
+	//}
+	//path := ns.Path + req.Path
+	path := req.Path
 
 	// The request path should take care of this already but this is useful for
 	// tests and as defense in depth
@@ -694,7 +696,7 @@ SWCPATH:
 	return wcPathDescrs[len(wcPathDescrs)-1].perms
 }
 
-func (c *Core) performPolicyChecks(ctx context.Context, acl *ACL, te *logical.TokenEntry, req *logical.Request, inEntity *identity.Entity, opts *PolicyCheckOpts) *AuthResults {
+func (c *Core) performPolicyChecks(ctx context.Context, acl *ACL, _ *logical.TokenEntry, req *logical.Request, _ *identity.Entity, opts *PolicyCheckOpts) *AuthResults {
 	ret := new(AuthResults)
 
 	// First, perform normal ACL checks if requested. The only time no ACL

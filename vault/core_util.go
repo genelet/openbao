@@ -5,7 +5,6 @@ package vault
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -27,10 +26,11 @@ func coreInit(c *Core, conf *CoreConfig) error {
 	return nil
 }
 
-func (c *Core) barrierViewForNamespace(namespaceId string) (*BarrierView, error) {
-	if namespaceId != namespace.RootNamespaceID {
-		return nil, fmt.Errorf("failed to find barrier view for non-root namespace")
-	}
+// func (c *Core) barrierViewForNamespace(namespaceId string) (*BarrierView, error) {
+func (c *Core) barrierViewForNamespace() (*BarrierView, error) {
+	//	if namespaceId != namespace.RootNamespaceID {
+	//		return nil, fmt.Errorf("failed to find barrier view for non-root namespace")
+	//	}
 
 	return c.systemBarrierView, nil
 }
@@ -41,7 +41,7 @@ func preSealPhysical(c *Core) {
 	c.physicalCache.Purge(context.Background())
 }
 
-func postUnsealPhysical(c *Core) error {
+func postUnsealPhysical(_ *Core) error {
 	return nil
 }
 

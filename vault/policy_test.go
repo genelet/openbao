@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/openbao/openbao/helper/namespace"
 )
 
 var rawPolicy = strings.TrimSpace(`
@@ -111,7 +110,7 @@ path "test/+/wildcard/+/end*" {
 `)
 
 func TestPolicy_Parse(t *testing.T) {
-	p, err := ParseACLPolicy(namespace.RootNamespace, rawPolicy)
+	p, err := ParseACLPolicy(rawPolicy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -338,7 +337,7 @@ func TestPolicy_Parse(t *testing.T) {
 }
 
 func TestPolicy_ParseBadRoot(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 name = "test"
 bad  = "foo"
 nope = "yes"
@@ -358,7 +357,7 @@ nope = "yes"
 
 func TestPolicy_ParseBadPath(t *testing.T) {
 	// The wrong spelling is intended here
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	capabilities = ["read"]
 	capabilites  = ["read"]
@@ -374,7 +373,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadPolicy(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	policy = "banana"
 }
@@ -389,7 +388,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadWrapping(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	policy = "read"
 	min_wrapping_ttl = 400
@@ -406,7 +405,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadCapabilities(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "/" {
 	capabilities = ["read", "banana"]
 }
@@ -421,7 +420,7 @@ path "/" {
 }
 
 func TestPolicy_ParseBadSegmentWildcard(t *testing.T) {
-	_, err := ParseACLPolicy(namespace.RootNamespace, strings.TrimSpace(`
+	_, err := ParseACLPolicy(strings.TrimSpace(`
 path "foo/+*" {
 	capabilities = ["read"]
 }

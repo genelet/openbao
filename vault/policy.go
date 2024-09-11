@@ -15,7 +15,8 @@ import (
 	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/mitchellh/copystructure"
 	"github.com/openbao/openbao/helper/identity"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/hclutil"
 	"github.com/openbao/openbao/sdk/v2/helper/identitytpl"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -86,7 +87,7 @@ type Policy struct {
 	Raw       string
 	Type      PolicyType
 	Templated bool
-	namespace *namespace.Namespace
+	//namespace *namespace.Namespace
 }
 
 // ShallowClone returns a shallow clone of the policy. This should not be used
@@ -98,7 +99,7 @@ func (p *Policy) ShallowClone() *Policy {
 		Raw:       p.Raw,
 		Type:      p.Type,
 		Templated: p.Templated,
-		namespace: p.namespace,
+		//namespace: p.namespace,
 	}
 }
 
@@ -210,10 +211,10 @@ func addGrantingPoliciesToMap(m map[uint32][]logical.PolicyInfo, policy *Policy,
 		}
 
 		m[capability] = append(m[capability], logical.PolicyInfo{
-			Name:          policy.Name,
-			NamespaceId:   policy.namespace.ID,
-			NamespacePath: policy.namespace.Path,
-			Type:          "acl",
+			Name: policy.Name,
+			//NamespaceId:   policy.namespace.ID,
+			//NamespacePath: policy.namespace.Path,
+			Type: "acl",
 		})
 	}
 
@@ -223,15 +224,15 @@ func addGrantingPoliciesToMap(m map[uint32][]logical.PolicyInfo, policy *Policy,
 // ParseACLPolicy is used to parse the specified ACL rules into an
 // intermediary set of policies, before being compiled into
 // the ACL
-func ParseACLPolicy(ns *namespace.Namespace, rules string) (*Policy, error) {
-	return parseACLPolicyWithTemplating(ns, rules, false, nil, nil)
+func ParseACLPolicy(rules string) (*Policy, error) {
+	return parseACLPolicyWithTemplating(rules, false, nil, nil)
 }
 
 // parseACLPolicyWithTemplating performs the actual work and checks whether we
 // should perform substitutions. If performTemplating is true we know that it
 // is templated so we don't check again, otherwise we check to see if it's a
 // templated policy.
-func parseACLPolicyWithTemplating(ns *namespace.Namespace, rules string, performTemplating bool, entity *identity.Entity, groups []*identity.Group) (*Policy, error) {
+func parseACLPolicyWithTemplating(rules string, performTemplating bool, entity *identity.Entity, groups []*identity.Group) (*Policy, error) {
 	// Parse the rules
 	root, err := hcl.Parse(rules)
 	if err != nil {
@@ -255,9 +256,9 @@ func parseACLPolicyWithTemplating(ns *namespace.Namespace, rules string, perform
 
 	// Create the initial policy and store the raw text of the rules
 	p := Policy{
-		Raw:       rules,
-		Type:      PolicyTypeACL,
-		namespace: ns,
+		Raw:  rules,
+		Type: PolicyTypeACL,
+		//namespace: ns,
 	}
 	if err := hcl.DecodeObject(&p, list); err != nil {
 		return nil, fmt.Errorf("failed to parse policy: %w", err)
@@ -283,11 +284,11 @@ func parsePaths(result *Policy, list *ast.ObjectList, performTemplating bool, en
 		// Check the path
 		if performTemplating {
 			_, templated, err := identitytpl.PopulateString(identitytpl.PopulateStringInput{
-				Mode:        identitytpl.ACLTemplating,
-				String:      key,
-				Entity:      identity.ToSDKEntity(entity),
-				Groups:      identity.ToSDKGroups(groups),
-				NamespaceID: result.namespace.ID,
+				Mode:   identitytpl.ACLTemplating,
+				String: key,
+				Entity: identity.ToSDKEntity(entity),
+				Groups: identity.ToSDKGroups(groups),
+				//NamespaceID: result.namespace.ID,
 			})
 			if err != nil {
 				continue
@@ -339,7 +340,7 @@ func parsePaths(result *Policy, list *ast.ObjectList, performTemplating bool, en
 		}
 
 		// Ensure we are using the full request path internally
-		pc.Path = result.namespace.Path + pc.Path
+		//pc.Path = result.namespace.Path + pc.Path
 
 		if strings.Contains(pc.Path, "+*") {
 			return fmt.Errorf("path %q: invalid use of wildcards ('+*' is forbidden)", pc.Path)

@@ -16,6 +16,8 @@ import (
 	"github.com/armon/go-radix"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/salt"
@@ -171,7 +173,7 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	defer r.l.Unlock()
 
 	// prepend namespace
-	prefix = mountEntry.Namespace().Path + prefix
+	//prefix = mountEntry.Namespace().Path + prefix
 
 	// Check if this is a nested mount
 	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
@@ -223,11 +225,11 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 
 // Unmount is used to remove a logical backend from a given prefix
 func (r *Router) Unmount(ctx context.Context, prefix string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	prefix = ns.Path + prefix
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//prefix = ns.Path + prefix
 
 	r.l.Lock()
 	defer r.l.Unlock()
@@ -255,12 +257,12 @@ func (r *Router) Unmount(ctx context.Context, prefix string) error {
 
 // Remount is used to change the mount location of a logical backend
 func (r *Router) Remount(ctx context.Context, src, dst string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	src = ns.Path + src
-	dst = ns.Path + dst
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//src = ns.Path + src
+	//dst = ns.Path + dst
 
 	r.l.Lock()
 	defer r.l.Unlock()
@@ -280,11 +282,11 @@ func (r *Router) Remount(ctx context.Context, src, dst string) error {
 // Taint is used to mark a path as tainted. This means only RollbackOperation
 // RevokeOperation requests are allowed to proceed
 func (r *Router) Taint(ctx context.Context, path string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//path = ns.Path + path
 
 	r.l.Lock()
 	defer r.l.Unlock()
@@ -297,11 +299,11 @@ func (r *Router) Taint(ctx context.Context, path string) error {
 
 // Untaint is used to unmark a path as tainted.
 func (r *Router) Untaint(ctx context.Context, path string) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//path = ns.Path + path
 
 	r.l.Lock()
 	defer r.l.Unlock()
@@ -355,12 +357,12 @@ func (r *Router) MatchingMount(ctx context.Context, path string) string {
 	return mount
 }
 
-func (r *Router) matchingMountInternal(ctx context.Context, path string) string {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return ""
-	}
-	path = ns.Path + path
+func (r *Router) matchingMountInternal(_ context.Context, path string) string {
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return ""
+	//}
+	//path = ns.Path + path
 
 	mount, _, ok := r.root.LongestPrefix(path)
 	if !ok {
@@ -370,12 +372,12 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 }
 
 // matchingPrefixInternal returns a mount prefix that a path may be a part of
-func (r *Router) matchingPrefixInternal(ctx context.Context, path string) string {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return ""
-	}
-	path = ns.Path + path
+func (r *Router) matchingPrefixInternal(_ context.Context, path string) string {
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return ""
+	//}
+	//path = ns.Path + path
 
 	var existing string
 	fn := func(existingPath string, v interface{}) bool {
@@ -412,12 +414,12 @@ func (r *Router) MatchingStorageByStoragePath(ctx context.Context, path string) 
 	return r.matchingStorage(ctx, path, false)
 }
 
-func (r *Router) matchingStorage(ctx context.Context, path string, apiPath bool) logical.Storage {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	path = ns.Path + path
+func (r *Router) matchingStorage(_ context.Context, path string, apiPath bool) logical.Storage {
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil
+	//}
+	//path = ns.Path + path
 
 	var raw interface{}
 	var ok bool
@@ -436,11 +438,11 @@ func (r *Router) matchingStorage(ctx context.Context, path string, apiPath bool)
 
 // MatchingMountEntry returns the MountEntry used for a path
 func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntry {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil
+	//}
+	//path = ns.Path + path
 
 	r.l.RLock()
 	_, raw, ok := r.root.LongestPrefix(path)
@@ -453,11 +455,11 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 
 // MatchingBackend returns the backend used for a path
 func (r *Router) MatchingBackend(ctx context.Context, path string) logical.Backend {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil
+	//}
+	//path = ns.Path + path
 
 	r.l.RLock()
 	_, raw, ok := r.root.LongestPrefix(path)
@@ -475,11 +477,11 @@ func (r *Router) MatchingBackend(ctx context.Context, path string) logical.Backe
 
 // MatchingSystemView returns the SystemView used for a path
 func (r *Router) MatchingSystemView(ctx context.Context, path string) logical.SystemView {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil
+	//}
+	//path = ns.Path + path
 
 	r.l.RLock()
 	_, raw, ok := r.root.LongestPrefix(path)
@@ -500,21 +502,23 @@ func (r *Router) MatchingMountByAPIPath(ctx context.Context, path string) string
 
 // MatchingStoragePrefixByAPIPath the storage prefix for the given api path
 func (r *Router) MatchingStoragePrefixByAPIPath(ctx context.Context, path string) (string, bool) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return "", false
-	}
-	path = ns.Path + path
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return "", false
+	//}
+	//path = ns.Path + path
 
 	_, prefix, found := r.matchingMountEntryByPath(ctx, path, true)
 	return prefix, found
 }
 
 // MatchingAPIPrefixByStoragePath the api path information for the given storage path
-func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string) (*namespace.Namespace, string, string, bool) {
+// func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string) (*namespace.Namespace, string, string, bool) {
+func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string) (string, string, bool) {
 	me, prefix, found := r.matchingMountEntryByPath(ctx, path, false)
 	if !found {
-		return nil, "", "", found
+		//return nil, "", "", false
+		return "", "", found
 	}
 
 	mountPath := me.Path
@@ -523,10 +527,11 @@ func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string
 		mountPath = credentialRoutePrefix + mountPath
 	}
 
-	return me.Namespace(), mountPath, prefix, found
+	//return me.Namespace(), mountPath, prefix, found
+	return mountPath, prefix, found
 }
 
-func (r *Router) matchingMountEntryByPath(ctx context.Context, path string, apiPath bool) (*MountEntry, string, bool) {
+func (r *Router) matchingMountEntryByPath(_ context.Context, path string, apiPath bool) (*MountEntry, string, bool) {
 	var raw interface{}
 	var ok bool
 	r.l.RLock()
@@ -560,14 +565,11 @@ func (r *Router) RouteExistenceCheck(ctx context.Context, req *logical.Request) 
 }
 
 func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenceCheck bool) (*logical.Response, bool, bool, error) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, false, false, err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, false, false, err
+	//}
 
-	for k, v := range r.root.ToMap() {
-		r.logger.Trace("Router routeCommon 001", "k", k, "v", fmt.Sprintf("%T", v), "namespace_id", ns.ID, "namespace_path", ns.Path)
-	}
 	// Find the mount point
 	r.l.RLock()
 	adjustedPath := req.Path
@@ -786,7 +788,7 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		ok, exists, err := re.backend.HandleExistenceCheck(ctx, req)
 		return nil, ok, exists, err
 	} else {
-		r.logger.Trace("Router routeCommon 005", "backend", fmt.Sprintf("%T", re.backend), "req", fmt.Sprintf("%+v", req))
+		r.logger.Trace("Router routeCommon 005", "backend", fmt.Sprintf("%T", re.backend), "req", fmt.Sprintf("%T", req))
 		if v, ok := re.backend.(*SystemBackend); ok {
 			r.logger.Trace("Router routeCommon 005.1", "backend", fmt.Sprintf("%T", v.Backend))
 		}
@@ -846,19 +848,20 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 			}
 		}
 
-		r.logger.Trace("Router routeCommon 006", "response", fmt.Sprintf("%+v", resp), "err", err)
+		r.logger.Trace("Router routeCommon 006", "response", fmt.Sprintf("%T", resp), "err", err)
 		return resp, false, false, err
 	}
 }
 
 // RootPath checks if the given path requires root privileges
 func (r *Router) RootPath(ctx context.Context, path string) bool {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return false
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return false
+	//}
 
-	adjustedPath := ns.Path + path
+	//adjustedPath := ns.Path + path
+	adjustedPath := path
 
 	r.l.RLock()
 	mount, raw, ok := r.root.LongestPrefix(adjustedPath)
@@ -894,12 +897,13 @@ func (r *Router) RootPath(ctx context.Context, path string) bool {
 //  2. exact
 //  3. wildcard
 func (r *Router) LoginPath(ctx context.Context, path string) bool {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return false
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return false
+	//}
 
-	adjustedPath := ns.Path + path
+	//adjustedPath := ns.Path + path
+	adjustedPath := path
 
 	r.l.RLock()
 	mount, raw, ok := r.root.LongestPrefix(adjustedPath)

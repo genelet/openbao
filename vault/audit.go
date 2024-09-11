@@ -12,7 +12,8 @@ import (
 
 	uuid "github.com/hashicorp/go-uuid"
 	"github.com/openbao/openbao/audit"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
 	"github.com/openbao/openbao/sdk/v2/helper/salt"
@@ -138,12 +139,12 @@ func (c *Core) enableAudit(ctx context.Context, entry *MountEntry, updateStorage
 	newTable := c.audit.shallowClone()
 	newTable.Entries = append(newTable.Entries, entry)
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	entry.NamespaceID = ns.ID
-	entry.namespace = ns
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//entry.NamespaceID = ns.ID
+	//entry.namespace = ns
 
 	if updateStorage {
 		if err := c.persistAudit(ctx, newTable, entry.Local); err != nil {
@@ -254,7 +255,7 @@ func (c *Core) loadAudits(ctx context.Context) error {
 			c.logger.Error("failed to decode local audit table", "error", err)
 			return errLoadAuditFailed
 		}
-		if localAuditTable != nil && len(localAuditTable.Entries) > 0 {
+		if len(localAuditTable.Entries) > 0 {
 			c.audit.Entries = append(c.audit.Entries, localAuditTable.Entries...)
 		}
 	}
@@ -280,19 +281,19 @@ func (c *Core) loadAudits(ctx context.Context) error {
 			needPersist = true
 		}
 
-		if entry.NamespaceID == "" {
-			entry.NamespaceID = namespace.RootNamespaceID
-			needPersist = true
-		}
+		//if entry.NamespaceID == "" {
+		//	entry.NamespaceID = namespace.RootNamespaceID
+		//	needPersist = true
+		//}
 		// Get the namespace from the namespace ID and load it in memory
-		ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
-		if err != nil {
-			return err
-		}
-		if ns == nil {
-			return namespace.ErrNoNamespace
-		}
-		entry.namespace = ns
+		//ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
+		//if err != nil {
+		//	return err
+		//}
+		//if ns == nil {
+		//	return namespace.ErrNoNamespace
+		//}
+		//entry.namespace = ns
 	}
 
 	if !needPersist {
@@ -559,18 +560,18 @@ func (b *basicAuditor) AuditResponse(ctx context.Context, input *logical.LogInpu
 type genericAuditor struct {
 	c         *Core
 	mountType string
-	namespace *namespace.Namespace
+	//namespace *namespace.Namespace
 }
 
 func (g genericAuditor) AuditRequest(ctx context.Context, input *logical.LogInput) error {
-	ctx = namespace.ContextWithNamespace(ctx, g.namespace)
+	//ctx = namespace.ContextWithNamespace(ctx, g.namespace)
 	logInput := *input
 	logInput.Type = g.mountType + "-request"
 	return g.c.auditBroker.LogRequest(ctx, &logInput, g.c.auditedHeaders)
 }
 
 func (g genericAuditor) AuditResponse(ctx context.Context, input *logical.LogInput) error {
-	ctx = namespace.ContextWithNamespace(ctx, g.namespace)
+	//ctx = namespace.ContextWithNamespace(ctx, g.namespace)
 	logInput := *input
 	logInput.Type = g.mountType + "-response"
 	return g.c.auditBroker.LogResponse(ctx, &logInput, g.c.auditedHeaders)

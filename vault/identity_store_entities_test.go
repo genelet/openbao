@@ -669,7 +669,7 @@ func TestIdentityStore_LoadingEntities(t *testing.T) {
 		Path:        "approle/",
 		Type:        "approle",
 		Description: "approle auth",
-		namespace:   namespace.RootNamespace,
+		//namespace:   namespace.RootNamespace,
 	}
 
 	// Mount UUID for approle auth

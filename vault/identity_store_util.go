@@ -112,22 +112,23 @@ func (i *IdentityStore) loadGroups(ctx context.Context) error {
 				continue
 			}
 
-			ns, err := i.namespacer.NamespaceByID(ctx, group.NamespaceID)
-			if err != nil {
-				return err
-			}
-			if ns == nil {
-				// Remove dangling groups
-				// Group's namespace doesn't exist anymore but the group
-				// from the namespace still exists.
-				i.logger.Warn("deleting group and its any existing aliases", "name", group.Name, "namespace_id", group.NamespaceID)
-				err = i.groupPacker.DeleteItem(ctx, group.ID)
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			nsCtx := namespace.ContextWithNamespace(ctx, ns)
+			//ns, err := i.namespacer.NamespaceByID(ctx, group.NamespaceID)
+			//if err != nil {
+			//	return err
+			//}
+			//if ns == nil {
+			// Remove dangling groups
+			// Group's namespace doesn't exist anymore but the group
+			// from the namespace still exists.
+			//i.logger.Warn("deleting group and its any existing aliases", "name", group.Name, "namespace_id", group.NamespaceID)
+			//err = i.groupPacker.DeleteItem(ctx, group.ID)
+			//if err != nil {
+			//	return err
+			//}
+			//continue
+			//}
+			//nsCtx := namespace.ContextWithNamespace(ctx, ns)
+			nsCtx := ctx
 
 			// Ensure that there are no groups with duplicate names
 			groupByName, err := i.MemDBGroupByName(nsCtx, group.Name, false)
@@ -279,22 +280,23 @@ LOOP:
 					continue
 				}
 
-				ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
-				if err != nil {
-					return err
-				}
-				if ns == nil {
-					// Remove dangling entities
-					// Entity's namespace doesn't exist anymore but the
-					// entity from the namespace still exists.
-					i.logger.Warn("deleting entity and its any existing aliases", "name", entity.Name, "namespace_id", entity.NamespaceID)
-					err = i.entityPacker.DeleteItem(ctx, entity.ID)
-					if err != nil {
-						return err
-					}
-					continue
-				}
-				nsCtx := namespace.ContextWithNamespace(ctx, ns)
+				//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
+				//if err != nil {
+				//	return err
+				//}
+				//if ns == nil {
+				// Remove dangling entities
+				// Entity's namespace doesn't exist anymore but the
+				// entity from the namespace still exists.
+				//i.logger.Warn("deleting entity and its any existing aliases", "name", entity.Name, "namespace_id", entity.NamespaceID)
+				//err = i.entityPacker.DeleteItem(ctx, entity.ID)
+				//if err != nil {
+				//	return err
+				//}
+				//continue
+				//}
+				//nsCtx := namespace.ContextWithNamespace(ctx, ns)
+				nsCtx := ctx
 
 				// Ensure that there are no entities with duplicate names
 				entityByName, err := i.MemDBEntityByName(nsCtx, entity.Name, false)
@@ -397,8 +399,19 @@ func (i *IdentityStore) upsertEntityInTxn(ctx context.Context, txn *memdb.Txn, e
 		return errors.New("entity is nil")
 	}
 
-	if entity.NamespaceID == "" {
-		entity.NamespaceID = namespace.RootNamespaceID
+	//if entity.NamespaceID == "" {
+	//	entity.NamespaceID = namespace.RootNamespaceID
+	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	if entity.NamespaceID == "" { // should be root?
+		entity.NamespaceID = ns.ID
+	}
+	// should the following logic for previous?
+	if previousEntity != nil && previousEntity.NamespaceID == "" {
+		previousEntity.NamespaceID = namespace.RootNamespaceID
 	}
 
 	if previousEntity != nil && previousEntity.NamespaceID != entity.NamespaceID {
@@ -415,7 +428,8 @@ func (i *IdentityStore) upsertEntityInTxn(ctx context.Context, txn *memdb.Txn, e
 		}
 
 		if alias.NamespaceID == "" {
-			alias.NamespaceID = namespace.RootNamespaceID
+			//alias.NamespaceID = namespace.RootNamespaceID
+			alias.NamespaceID = ns.ID // should be root?
 		}
 
 		switch {
@@ -1167,19 +1181,13 @@ func (i *IdentityStore) sanitizeAlias(ctx context.Context, alias *identity.Alias
 		alias.LocalBucketKey = i.localAliasPacker.BucketKey(alias.CanonicalID)
 	}
 
-	if alias.NamespaceID == "" {
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return err
-		}
-		alias.NamespaceID = ns.ID
-	}
-
 	ns, err := namespace.FromContext(ctx)
 	if err != nil {
 		return err
 	}
-	if ns.ID != alias.NamespaceID {
+	if alias.NamespaceID == "" {
+		alias.NamespaceID = ns.ID // should be root?
+	} else if ns.ID != alias.NamespaceID {
 		return errors.New("alias belongs to a different namespace")
 	}
 
@@ -1216,10 +1224,9 @@ func (i *IdentityStore) sanitizeEntity(ctx context.Context, entity *identity.Ent
 	if err != nil {
 		return err
 	}
-	if entity.NamespaceID == "" {
+	if entity.NamespaceID == "" { // should be root?
 		entity.NamespaceID = ns.ID
-	}
-	if ns.ID != entity.NamespaceID {
+	} else if ns.ID != entity.NamespaceID {
 		return errors.New("entity does not belong to this namespace")
 	}
 
@@ -1227,7 +1234,7 @@ func (i *IdentityStore) sanitizeEntity(ctx context.Context, entity *identity.Ent
 	if entity.Name == "" {
 		entity.Name, err = i.generateName(ctx, "entity")
 		if err != nil {
-			return fmt.Errorf("failed to generate entity name")
+			return fmt.Errorf("failed to generate entity name: %w", err)
 		}
 	}
 
@@ -1272,18 +1279,13 @@ func (i *IdentityStore) sanitizeAndUpsertGroup(ctx context.Context, group *ident
 		group.BucketKey = i.groupPacker.BucketKey(group.ID)
 	}
 
-	if group.NamespaceID == "" {
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return err
-		}
-		group.NamespaceID = ns.ID
-	}
 	ns, err := namespace.FromContext(ctx)
 	if err != nil {
 		return err
 	}
-	if ns.ID != group.NamespaceID {
+	if group.NamespaceID == "" {
+		group.NamespaceID = ns.ID // should be root?
+	} else if ns.ID != group.NamespaceID {
 		return errors.New("group does not belong to this namespace")
 	}
 
@@ -1291,7 +1293,7 @@ func (i *IdentityStore) sanitizeAndUpsertGroup(ctx context.Context, group *ident
 	if group.Name == "" {
 		group.Name, err = i.generateName(ctx, "group")
 		if err != nil {
-			return fmt.Errorf("failed to generate group name")
+			return fmt.Errorf("failed to generate group name: %w", err)
 		}
 	}
 

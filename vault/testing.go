@@ -42,6 +42,8 @@ import (
 	"github.com/openbao/openbao/command/server"
 	"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/testhelpers/corehelpers"
 	"github.com/openbao/openbao/helper/testhelpers/pluginhelpers"
 	"github.com/openbao/openbao/internalshared/configutil"
@@ -503,20 +505,20 @@ func TestKeyCopy(key []byte) []byte {
 	return result
 }
 
-func TestDynamicSystemView(c *Core, ns *namespace.Namespace) *dynamicSystemView {
+func TestDynamicSystemView(c *Core) *dynamicSystemView {
 	me := &MountEntry{
 		Config: MountConfig{
 			DefaultLeaseTTL: 24 * time.Hour,
 			MaxLeaseTTL:     2 * 24 * time.Hour,
 		},
-		NamespaceID: namespace.RootNamespace.ID,
-		namespace:   namespace.RootNamespace,
+		//	NamespaceID: namespace.RootNamespace.ID,
+		//	namespace:   namespace.RootNamespace,
 	}
 
-	if ns != nil {
-		me.NamespaceID = ns.ID
-		me.namespace = ns
-	}
+	//if ns != nil {
+	//	me.NamespaceID = ns.ID
+	//	me.namespace = ns
+	//}
 
 	return &dynamicSystemView{c, me}
 }
@@ -617,7 +619,7 @@ func TestRunTestPlugin(t testing.T, c *Core, pluginType consts.PluginType, plugi
 }
 
 func TestPluginClientConfig(c *Core, pluginType consts.PluginType, pluginName string) pluginutil.PluginClientConfig {
-	dsv := TestDynamicSystemView(c, nil)
+	dsv := TestDynamicSystemView(c)
 	switch pluginType {
 	case consts.PluginTypeCredential, consts.PluginTypeSecrets:
 		return pluginutil.PluginClientConfig{
@@ -1861,7 +1863,7 @@ func (cluster *TestCluster) StartCore(t testing.T, idx int, opts *TestClusterOpt
 	tcc.Logger().Info("restarted test core", "core", idx)
 }
 
-func (testCluster *TestCluster) newCore(t testing.T, idx int, coreConfig *CoreConfig, opts *TestClusterOptions, listeners []*TestListener, pubKey ed25519.PublicKey) (func(), *Core, CoreConfig, http.Handler) {
+func (testCluster *TestCluster) newCore(t testing.T, idx int, coreConfig *CoreConfig, opts *TestClusterOptions, listeners []*TestListener, _ ed25519.PublicKey) (func(), *Core, CoreConfig, http.Handler) {
 	localConfig := *coreConfig
 	cleanupFunc := func() {}
 	var handler http.Handler

@@ -87,22 +87,22 @@ func TestExpiration_Metrics(t *testing.T) {
 
 	for i := 0; i < 50; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i),
-			namespace:  namespace.RootNamespace,
+			LeaseID: "lease" + fmt.Sprintf("%d", i),
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
 
-		otherNS := &namespace.Namespace{
-			ID:   "nsid",
-			Path: "foo/bar",
-		}
+		//otherNS := &namespace.Namespace{
+		//	ID:   "nsid",
+		//	Path: "foo/bar",
+		//}
 
 		otherNSle := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			namespace:  otherNS,
+			LeaseID: "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			//namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -124,9 +124,9 @@ func TestExpiration_Metrics(t *testing.T) {
 
 	for i := 50; i < 250; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i+1),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i+1),
-			namespace:  namespace.RootNamespace,
+			LeaseID: "lease" + fmt.Sprintf("%d", i+1),
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(2 * time.Hour),
 		}
@@ -159,10 +159,10 @@ func TestExpiration_Metrics(t *testing.T) {
 		t.Fatal("lease aggregation returns nil metrics")
 	}
 
-	labelOneHour := metrics.Label{"expiring", time.Now().Add(time.Hour).Round(time.Hour).String()}
-	labelTwoHours := metrics.Label{"expiring", time.Now().Add(2 * time.Hour).Round(time.Hour).String()}
-	nsLabel := metrics.Label{"namespace", "root"}
-	nsLabelNonRoot := metrics.Label{"namespace", "nsid"}
+	labelOneHour := metrics.Label{Name: "expiring", Value: time.Now().Add(time.Hour).Round(time.Hour).String()}
+	labelTwoHours := metrics.Label{Name: "expiring", Value: time.Now().Add(2 * time.Hour).Round(time.Hour).String()}
+	nsLabel := metrics.Label{Name: "namespace", Value: "root"}
+	nsLabelNonRoot := metrics.Label{Name: "namespace", Value: "nsid"}
 
 	foundLabelOne := false
 	foundLabelTwo := false
@@ -241,23 +241,23 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 	exp := c.expiration
 
 	expectedCount := 0
-	otherNS := &namespace.Namespace{
-		ID:   "nsid",
-		Path: "foo/bar",
-	}
+	//otherNS := &namespace.Namespace{
+	//	ID:   "nsid",
+	//	Path: "foo/bar",
+	//}
 	for i := 0; i < 50; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i),
-			namespace:  namespace.RootNamespace,
+			LeaseID: "lease" + fmt.Sprintf("%d", i),
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
 
 		otherNSle := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			namespace:  otherNS,
+			LeaseID: "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			//namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -284,18 +284,18 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 	// past, but for this exercise it should be fine to set it to whatever
 	for i := 50; i < 60; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i+1),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i+1),
-			namespace:  namespace.RootNamespace,
+			LeaseID: "lease" + fmt.Sprintf("%d", i+1),
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
 		}
 
 		otherNSle := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
-			namespace:  otherNS,
+			LeaseID: "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
+			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
+			//namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -334,25 +334,25 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 	exp := c.expiration
 
 	expectedCount := 0
-	otherNS := &namespace.Namespace{
-		ID:   "nsid",
-		Path: "foo/bar",
-	}
+	//otherNS := &namespace.Namespace{
+	//	ID:   "nsid",
+	//	Path: "foo/bar",
+	//}
 	for i := 0; i < 50; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i),
-			LoginRole:  "loginRole" + fmt.Sprintf("%d", i),
-			namespace:  namespace.RootNamespace,
+			LeaseID:   "lease" + fmt.Sprintf("%d", i),
+			Path:      "foo/bar/" + fmt.Sprintf("%d", i),
+			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
 
 		otherNSle := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			LoginRole:  "loginRole" + fmt.Sprintf("%d", i),
-			namespace:  otherNS,
+			LeaseID:   "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			Path:      "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
+			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
+			//namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -379,20 +379,20 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 	// past, but for this exercise it should be fine to set it to whatever
 	for i := 50; i < 60; i++ {
 		le := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i+1),
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i+1),
-			LoginRole:  "loginRole" + fmt.Sprintf("%d", i),
-			namespace:  namespace.RootNamespace,
+			LeaseID:   "lease" + fmt.Sprintf("%d", i+1),
+			Path:      "foo/bar/" + fmt.Sprintf("%d", i+1),
+			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
+			//namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
 		}
 
 		otherNSle := &leaseEntry{
-			LeaseID:    "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
-			Path:       "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
-			LoginRole:  "loginRole" + fmt.Sprintf("%d", i),
-			namespace:  otherNS,
+			LeaseID:   "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
+			Path:      "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
+			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
+			//namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -462,9 +462,9 @@ func TestExpiration_Tidy(t *testing.T) {
 
 	// Create a lease entry without a client token in it
 	le := &leaseEntry{
-		LeaseID:   "lease/with/no/client/token",
-		Path:      "foo/bar",
-		namespace: namespace.RootNamespace,
+		LeaseID: "lease/with/no/client/token",
+		Path:    "foo/bar",
+		//namespace: namespace.RootNamespace,
 	}
 
 	// Persist the invalid lease entry
@@ -707,7 +707,7 @@ func benchmarkExpirationBackend(b *testing.B, physicalBackend physical.Backend, 
 	if err != nil {
 		b.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -776,7 +776,7 @@ func BenchmarkExpiration_Create_Leases(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -817,7 +817,7 @@ func TestExpiration_Restore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -991,7 +991,7 @@ func TestExpiration_Register_BatchToken(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+		err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1254,7 +1254,7 @@ func TestExpiration_Revoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1301,7 +1301,7 @@ func TestExpiration_RevokeOnExpire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1359,7 +1359,7 @@ func TestExpiration_RevokePrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1428,7 +1428,7 @@ func TestExpiration_RevokeByToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1527,7 +1527,7 @@ func TestExpiration_RevokeByToken_Blocking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1737,7 +1737,7 @@ func TestExpiration_RenewToken_period_backend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "auth/foo/", &MountEntry{Path: "auth/foo/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "auth/foo/", &MountEntry{Path: "auth/foo/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1843,7 +1843,7 @@ func TestExpiration_Renew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1914,7 +1914,7 @@ func TestExpiration_Renew_NotRenewable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1965,7 +1965,7 @@ func TestExpiration_Renew_RevokeOnExpire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2041,7 +2041,7 @@ func TestExpiration_Renew_FinalSecond(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2115,7 +2115,7 @@ func TestExpiration_Renew_FinalSecond_Lease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{Path: "prod/aws/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2178,7 +2178,7 @@ func TestExpiration_revokeEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2196,7 +2196,7 @@ func TestExpiration_revokeEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now(),
-		namespace:  namespace.RootNamespace,
+		//namespace:  namespace.RootNamespace,
 	}
 
 	err = exp.revokeEntry(namespace.RootContext(nil), le)
@@ -2248,7 +2248,7 @@ func TestExpiration_revokeEntry_token(t *testing.T) {
 		Path:        "foo/bar",
 		IssueTime:   time.Now(),
 		ExpireTime:  time.Now().Add(time.Minute),
-		namespace:   namespace.RootNamespace,
+		//namespace:   namespace.RootNamespace,
 	}
 
 	if err := exp.persistEntry(namespace.RootContext(nil), le); err != nil {
@@ -2320,7 +2320,7 @@ func TestExpiration_renewEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2338,7 +2338,7 @@ func TestExpiration_renewEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now(),
-		namespace:  namespace.RootNamespace,
+		//namespace:  namespace.RootNamespace,
 	}
 
 	resp, err := exp.renewEntry(namespace.RootContext(nil), le, 0)
@@ -2386,7 +2386,7 @@ func TestExpiration_revokeEntry_rejected_fairsharing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "foo/bar/", &MountEntry{Path: "foo/bar/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2404,7 +2404,7 @@ func TestExpiration_revokeEntry_rejected_fairsharing(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(time.Minute),
-		namespace:  namespace.RootNamespace,
+		//namespace:  namespace.RootNamespace,
 	}
 
 	err = exp.persistEntry(namespace.RootContext(nil), le)
@@ -2473,7 +2473,7 @@ func TestExpiration_renewAuthEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "auth/foo/", &MountEntry{Path: "auth/foo/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "auth/foo/", &MountEntry{Path: "auth/foo/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2492,7 +2492,7 @@ func TestExpiration_renewAuthEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(time.Minute),
-		namespace:  namespace.RootNamespace,
+		//namespace:  namespace.RootNamespace,
 	}
 
 	resp, err := exp.renewAuthEntry(namespace.RootContext(nil), &logical.Request{}, le, 0)
@@ -2536,7 +2536,7 @@ func TestExpiration_PersistLoadDelete(t *testing.T) {
 		IssueTime:       lastTime,
 		ExpireTime:      lastTime,
 		LastRenewalTime: lastTime,
-		namespace:       namespace.RootNamespace,
+		//namespace:       namespace.RootNamespace,
 	}
 	if err := exp.persistEntry(namespace.RootContext(nil), le); err != nil {
 		t.Fatalf("err: %v", err)
@@ -3222,7 +3222,7 @@ func TestExpiration_unrecoverableErrorMakesIrrevocable(t *testing.T) {
 	makeJob := func() *revocationJob {
 		leaseID := registerOneLease(t, ctx, exp)
 
-		job, err := newRevocationJob(ctx, leaseID, namespace.RootNamespace, exp)
+		job, err := newRevocationJob(ctx, leaseID, exp)
 		if err != nil {
 			t.Fatalf("err making revocation job: %v", err)
 		}

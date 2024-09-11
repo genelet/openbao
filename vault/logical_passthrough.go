@@ -102,7 +102,7 @@ type PassthroughBackend struct {
 	revoke         func(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error)
 }
 
-func (b *PassthroughBackend) handleRevoke(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *PassthroughBackend) handleRevoke(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 	// This is a no-op
 	return nil, nil
 }

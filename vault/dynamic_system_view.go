@@ -45,8 +45,8 @@ type extendedSystemViewImpl struct {
 func (e extendedSystemViewImpl) Auditor() logical.Auditor {
 	return genericAuditor{
 		mountType: e.mountEntry.Type,
-		namespace: e.mountEntry.Namespace(),
-		c:         e.core,
+		//namespace: e.mountEntry.Namespace(),
+		c: e.core,
 	}
 }
 
@@ -74,18 +74,18 @@ func (e extendedSystemViewImpl) SudoPrivilege(ctx context.Context, path string, 
 	// Add token policies
 	policyNames[te.NamespaceID] = append(policyNames[te.NamespaceID], te.Policies...)
 
-	tokenNS, err := NamespaceByID(ctx, te.NamespaceID, e.core)
-	if err != nil {
-		e.core.logger.Error("failed to lookup token namespace", "error", err)
-		return false
-	}
-	if tokenNS == nil {
-		e.core.logger.Error("failed to lookup token namespace", "error", namespace.ErrNoNamespace)
-		return false
-	}
+	//tokenNS, err := NamespaceByID(ctx, te.NamespaceID, e.core)
+	//if err != nil {
+	//	e.core.logger.Error("failed to lookup token namespace", "error", err)
+	//	return false
+	//}
+	//if tokenNS == nil {
+	//	e.core.logger.Error("failed to lookup token namespace", "error", namespace.ErrNoNamespace)
+	//	return false
+	//}
 
 	// Add identity policies from all the namespaces
-	entity, identityPolicies, err := e.core.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
+	entity, identityPolicies, err := e.core.fetchEntityAndDerivedPolicies(ctx, te.EntityID, te.NoIdentityPolicies)
 	if err != nil {
 		e.core.logger.Error("failed to fetch identity policies", "error", err)
 		return false
@@ -94,12 +94,13 @@ func (e extendedSystemViewImpl) SudoPrivilege(ctx context.Context, path string, 
 		policyNames[nsID] = append(policyNames[nsID], nsPolicies...)
 	}
 
-	tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	//tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	tokenCtx := ctx
 
 	// Add the inline policy if it's set
 	policies := make([]*Policy, 0)
 	if te.InlinePolicy != "" {
-		inlinePolicy, err := ParseACLPolicy(tokenNS, te.InlinePolicy)
+		inlinePolicy, err := ParseACLPolicy(te.InlinePolicy)
 		if err != nil {
 			e.core.logger.Error("failed to parse the token's inline policy", "error", err)
 			return false
@@ -320,9 +321,9 @@ func (d dynamicSystemView) EntityInfo(entityID string) (*logical.Entity, error) 
 	for _, a := range entity.Aliases {
 
 		// Don't return aliases from other namespaces
-		if a.NamespaceID != d.mountEntry.NamespaceID {
-			continue
-		}
+		//if a.NamespaceID != d.mountEntry.NamespaceID {
+		//	continue
+		//}
 
 		alias := identity.ToSDKAlias(a)
 
@@ -362,9 +363,9 @@ func (d dynamicSystemView) GroupsForEntity(entityID string) ([]*logical.Group, e
 	logicalGroups := make([]*logical.Group, 0, len(groups))
 	for _, g := range groups {
 		// Don't return groups from other namespaces
-		if g.NamespaceID != d.mountEntry.NamespaceID {
-			continue
-		}
+		//if g.NamespaceID != d.mountEntry.NamespaceID {
+		//	continue
+		//}
 
 		logicalGroups = append(logicalGroups, identity.ToSDKGroup(g))
 	}
@@ -397,7 +398,7 @@ func (d dynamicSystemView) GeneratePasswordFromPolicy(ctx context.Context, polic
 		defer cancel()
 	}
 
-	ctx = namespace.ContextWithNamespace(ctx, d.mountEntry.Namespace())
+	//ctx = namespace.ContextWithNamespace(ctx, d.mountEntry.Namespace())
 
 	policyCfg, err := d.retrievePasswordPolicy(ctx, policyName)
 	if err != nil {

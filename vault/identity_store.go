@@ -15,13 +15,14 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/helper/identity"
-	"github.com/openbao/openbao/helper/metricsutil"
+
+	//"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
 	"github.com/openbao/openbao/helper/versions"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	"github.com/patrickmn/go-cache"
+	//"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -39,7 +40,7 @@ func (c *Core) IdentityStore() *IdentityStore {
 	return c.identityStore
 }
 
-func (i *IdentityStore) resetDB(ctx context.Context) error {
+func (i *IdentityStore) resetDB(_ context.Context) error {
 	var err error
 
 	i.db, err = memdb.NewMemDB(identityStoreSchema(!i.disableLowerCasedNames))
@@ -52,12 +53,12 @@ func (i *IdentityStore) resetDB(ctx context.Context) error {
 
 func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendConfig, logger log.Logger) (*IdentityStore, error) {
 	iStore := &IdentityStore{
-		view:          config.StorageView,
-		logger:        logger,
-		router:        core.router,
-		redirectAddr:  core.redirectAddr,
-		localNode:     core,
-		namespacer:    core,
+		view:         config.StorageView,
+		logger:       logger,
+		router:       core.router,
+		redirectAddr: core.redirectAddr,
+		localNode:    core,
+		//namespacer:    core,
 		metrics:       core.MetricSink(),
 		totpPersister: core,
 		groupUpdater:  core,
@@ -118,8 +119,8 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		RunningVersion: versions.DefaultBuiltinVersion,
 	}
 
-	iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
-	iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
+	//iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
+	//iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
 
 	err = iStore.Setup(ctx, config)
 	if err != nil {
@@ -837,17 +838,18 @@ func (i *IdentityStore) Invalidate(ctx context.Context, key string) {
 		return
 
 	case strings.HasPrefix(key, oidcTokensPrefix):
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			i.logger.Error("error retrieving namespace", "error", err)
-			return
-		}
+		//ns, err := namespace.FromContext(ctx)
+		//if err != nil {
+		//	i.logger.Error("error retrieving namespace", "error", err)
+		//	return
+		//}
 
 		// Wipe the cache for the requested namespace. This will also clear
 		// the shared namespace as well.
-		if err := i.oidcCache.Flush(ns); err != nil {
-			i.logger.Error("error flushing oidc cache", "error", err)
-		}
+		//if err := i.oidcCache.Flush(ns); err != nil {
+		//if err := i.oidcCache.Flush(nil); err != nil {
+		//	i.logger.Error("error flushing oidc cache", "error", err)
+		//}
 	case strings.HasPrefix(key, clientPath):
 		name := strings.TrimPrefix(key, clientPath)
 
@@ -1159,18 +1161,18 @@ func (i *IdentityStore) CreateEntity(ctx context.Context) (*identity.Entity, err
 	}
 
 	// Emit a metric for the new entity
-	ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
-	var nsLabel metrics.Label
-	if err != nil {
-		nsLabel = metrics.Label{"namespace", "unknown"}
-	} else {
-		nsLabel = metricsutil.NamespaceLabel(ns)
-	}
+	//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
+	//var nsLabel metrics.Label
+	//if err != nil {
+	//	nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
+	//} else {
+	//	nsLabel = metricsutil.NamespaceLabel(ns)
+	//}
 	i.metrics.IncrCounterWithLabels(
 		[]string{"identity", "entity", "creation"},
 		1,
 		[]metrics.Label{
-			nsLabel,
+			//nsLabel,
 		})
 
 	return entity.Clone()
@@ -1267,20 +1269,20 @@ func (i *IdentityStore) CreateOrFetchEntity(ctx context.Context, alias *logical.
 		}
 
 		// Emit a metric for the new entity
-		ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
-		var nsLabel metrics.Label
-		if err != nil {
-			nsLabel = metrics.Label{"namespace", "unknown"}
-		} else {
-			nsLabel = metricsutil.NamespaceLabel(ns)
-		}
+		//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
+		//var nsLabel metrics.Label
+		//if err != nil {
+		//	nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
+		//} else {
+		//	nsLabel = metricsutil.NamespaceLabel(ns)
+		//}
 		i.metrics.IncrCounterWithLabels(
 			[]string{"identity", "entity", "creation"},
 			1,
 			[]metrics.Label{
-				nsLabel,
-				{"auth_method", newAlias.MountType},
-				{"mount_point", newAlias.MountPath},
+				//nsLabel,
+				{Name: "auth_method", Value: newAlias.MountType},
+				{Name: "mount_point", Value: newAlias.MountPath},
 			})
 		entityCreated = true
 	}

@@ -278,8 +278,8 @@ func TestCore_Mount_Local(t *testing.T) {
 				UUID:             "abcd",
 				Accessor:         "kv-abcd",
 				BackendAwareUUID: "abcde",
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 			{
 				Table:            mountTableType,
@@ -288,8 +288,8 @@ func TestCore_Mount_Local(t *testing.T) {
 				UUID:             "bcde",
 				Accessor:         "kv-bcde",
 				BackendAwareUUID: "bcdea",
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 		},
 	}
@@ -381,8 +381,8 @@ func TestCore_FindOps(t *testing.T) {
 				UUID:             "abcd",
 				Accessor:         "kv-abcd",
 				BackendAwareUUID: uuid1,
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 			{
 				Table:            mountTableType,
@@ -391,8 +391,8 @@ func TestCore_FindOps(t *testing.T) {
 				UUID:             "bcde",
 				Accessor:         "kv-bcde",
 				BackendAwareUUID: uuid2,
-				NamespaceID:      namespace.RootNamespaceID,
-				namespace:        namespace.RootNamespace,
+				//NamespaceID:      namespace.RootNamespaceID,
+				//namespace:        namespace.RootNamespace,
 			},
 		},
 	}
@@ -1001,8 +1001,6 @@ func TestCore_MountInitialize(t *testing.T) {
 					UUID:             "abcd",
 					Accessor:         "initable-abcd",
 					BackendAwareUUID: "abcde",
-					NamespaceID:      namespace.RootNamespaceID,
-					namespace:        namespace.RootNamespace,
 				},
 			},
 		}

@@ -556,7 +556,8 @@ func (b *SystemBackend) handleStorageRaftSnapshotWrite(force bool) framework.Ope
 			default:
 				return logical.ErrorResponse("could not verify hash file, possibly the snapshot is using a different autoseal key; use the snapshot-force API to bypass this check"), logical.ErrInvalidRequest
 			}
-		case err != nil:
+		//case err != nil:
+		default:
 			b.Core.logger.Error("raft snapshot restore: failed to write snapshot", "error", err)
 			return nil, err
 		}
@@ -586,7 +587,7 @@ func (b *SystemBackend) handleStorageRaftSnapshotWrite(force bool) framework.Ope
 				}
 			}()
 
-			ctx, ctxCancel := context.WithCancel(namespace.RootContext(nil))
+			//ctx, ctxCancel := context.WithCancel(namespace.RootContext(nil))
 
 			// We are calling the callback function synchronously here while we
 			// have the lock. So set it to nil and restore the callback when we
@@ -630,6 +631,7 @@ func (b *SystemBackend) handleStorageRaftSnapshotWrite(force bool) framework.Ope
 					return err
 				}
 			}
+			ctx, ctxCancel := context.WithCancel(namespace.RootContext(nil))
 			if err := b.Core.postUnseal(ctx, ctxCancel, standardUnsealStrategy{}); err != nil {
 				b.Core.logger.Error("raft snapshot restore failed postUnseal", "error", err)
 				return err

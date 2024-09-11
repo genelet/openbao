@@ -578,14 +578,14 @@ func testMakeTokenViaRequestContext(t testing.TB, ctx context.Context, ts *Token
 		return resp
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
 
 	te := &logical.TokenEntry{
-		Path:        resp.Auth.CreationPath,
-		NamespaceID: ns.ID,
+		Path: resp.Auth.CreationPath,
+		//NamespaceID: ns.ID,
 	}
 
 	if resp.Auth.TokenType != logical.TokenTypeBatch {
@@ -815,7 +815,7 @@ func TestTokenStore_HandleRequest_ListAccessors(t *testing.T) {
 			t.Fatal(err)
 		}
 		le := &logical.StorageEntry{Key: saltID, Value: []byte(aEntry.TokenID)}
-		if err := ts.accessorView(namespace.RootNamespace).Put(namespace.RootContext(nil), le); err != nil {
+		if err := ts.accessorView(nil).Put(namespace.RootContext(nil), le); err != nil {
 			t.Fatalf("failed to persist accessor index entry: %v", err)
 		}
 	}
@@ -1152,7 +1152,7 @@ func TestTokenStore_CreateLookup_ExpirationInRestoreMode(t *testing.T) {
 		Path:        ent.Path,
 		IssueTime:   time.Now(),
 		ExpireTime:  time.Now().Add(1 * time.Hour),
-		namespace:   namespace.RootNamespace,
+		//namespace:   namespace.RootNamespace,
 	}
 	if err := ts.expiration.persistEntry(namespace.RootContext(nil), le); err != nil {
 		t.Fatalf("err: %v", err)
@@ -1311,7 +1311,8 @@ func TestTokenStore_Revoke_Leases(t *testing.T) {
 
 	// Mount a noop backend
 	noop := &NoopBackend{}
-	err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor", namespace: namespace.RootNamespace}, view)
+	//err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor", namespace: namespace.RootNamespace}, view)
+	err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1953,7 +1954,7 @@ func TestTokenStore_HandleRequest_CreateToken_NonRoot_RootChild(t *testing.T) {
 	ts := core.tokenStore
 	ps := core.policyStore
 
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ := ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test1"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
@@ -3486,19 +3487,19 @@ func TestTokenStore_RoleDisallowedPolicies(t *testing.T) {
 	ps := core.policyStore
 
 	// Create 3 different policies
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ := ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test1"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
 
-	policy, _ = ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ = ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test2"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
 
-	policy, _ = ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ = ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test3"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
@@ -3754,25 +3755,25 @@ func TestTokenStore_RoleDisallowedPoliciesGlob(t *testing.T) {
 	ps := core.policyStore
 
 	// Create 4 different policies
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ := ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test1"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
 
-	policy, _ = ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ = ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test2"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
 
-	policy, _ = ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ = ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test3"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
 
-	policy, _ = ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ = ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "test3b"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
@@ -5063,7 +5064,7 @@ func TestTokenStore_NoDefaultPolicy(t *testing.T) {
 	core, _, root := TestCoreUnsealed(t)
 	ts := core.tokenStore
 	ps := core.policyStore
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, tokenCreationPolicy)
+	policy, _ := ParseACLPolicy(tokenCreationPolicy)
 	policy.Name = "policy1"
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
@@ -5770,7 +5771,8 @@ func TestTokenStore_TidyLeaseRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor", namespace: namespace.RootNamespace}, view)
+	//err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor", namespace: namespace.RootNamespace}, view)
+	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}

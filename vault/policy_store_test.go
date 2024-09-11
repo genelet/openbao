@@ -119,7 +119,7 @@ func testPolicyStoreCRUD(t *testing.T, ps *PolicyStore, ns *namespace.Namespace)
 
 	// Set should work
 	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ := ParseACLPolicy(ns, aclPolicy)
+	policy, _ := ParseACLPolicy(aclPolicy)
 	err = ps.SetPolicy(ctx, policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -254,36 +254,37 @@ func testPolicyStorePredefined(t *testing.T, ps *PolicyStore, ns *namespace.Name
 func TestPolicyStore_ACL(t *testing.T) {
 	t.Run("root-ns", func(t *testing.T) {
 		_, ps := mockPolicyWithCore(t, false)
-		testPolicyStoreACL(t, ps, namespace.RootNamespace)
+		testPolicyStoreACL(t, ps)
 	})
 }
 
-func testPolicyStoreACL(t *testing.T, ps *PolicyStore, ns *namespace.Namespace) {
-	ctx := namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ := ParseACLPolicy(ns, aclPolicy)
+func testPolicyStoreACL(t *testing.T, ps *PolicyStore) {
+	ctx := context.Background()
+	policy, _ := ParseACLPolicy(aclPolicy)
 	err := ps.SetPolicy(ctx, policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	policy, _ = ParseACLPolicy(ns, aclPolicy2)
+	ctx = context.Background()
+	policy, _ = ParseACLPolicy(aclPolicy2)
 	err = ps.SetPolicy(ctx, policy)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
-	ctx = namespace.ContextWithNamespace(context.Background(), ns)
-	acl, err := ps.ACL(ctx, nil, map[string][]string{ns.ID: {"dev", "ops"}})
+	ctx = context.Background()
+	//acl, err := ps.ACL(ctx, nil, map[string][]string{ns.ID: {"dev", "ops"}})
+	acl, err := ps.ACL(ctx, nil, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testLayeredACL(t, acl, ns)
+	testLayeredACL(t, acl)
 }
 
 func TestDefaultPolicy(t *testing.T) {
 	ctx := namespace.ContextWithNamespace(context.Background(), namespace.RootNamespace)
 
-	policy, err := ParseACLPolicy(namespace.RootNamespace, defaultPolicy)
+	policy, err := ParseACLPolicy(defaultPolicy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,9 +333,9 @@ func TestDefaultPolicy(t *testing.T) {
 func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 	t.Parallel()
 	tests := map[string]struct {
-		policyStoreKey       string
-		policyStoreValue     any
-		paramNamespace       string
+		policyStoreKey   string
+		policyStoreValue any
+		//paramNamespace       string
 		paramPolicyName      string
 		paramPolicyType      PolicyType
 		isErrorExpected      bool
@@ -343,22 +344,22 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 		"happy-acl": {
 			policyStoreKey:   "1AbcD/policy1",
 			policyStoreValue: PolicyTypeACL,
-			paramNamespace:   "1AbcD",
-			paramPolicyName:  "policy1",
-			paramPolicyType:  PolicyTypeACL,
+			//paramNamespace:   "1AbcD",
+			paramPolicyName: "policy1",
+			paramPolicyType: PolicyTypeACL,
 		},
 		"not-in-map-acl": {
-			policyStoreKey:       "2WxyZ/policy2",
-			policyStoreValue:     PolicyTypeACL,
-			paramNamespace:       "1AbcD",
+			policyStoreKey:   "2WxyZ/policy2",
+			policyStoreValue: PolicyTypeACL,
+			//paramNamespace:       "1AbcD",
 			paramPolicyName:      "policy1",
 			isErrorExpected:      true,
 			expectedErrorMessage: "policy does not exist in type map",
 		},
 		"unknown-policy-type": {
-			policyStoreKey:       "1AbcD/policy1",
-			policyStoreValue:     7,
-			paramNamespace:       "1AbcD",
+			policyStoreKey:   "1AbcD/policy1",
+			policyStoreValue: 7,
+			//paramNamespace:       "1AbcD",
 			paramPolicyName:      "policy1",
 			isErrorExpected:      true,
 			expectedErrorMessage: "unknown policy type for: 1AbcD/policy1",
@@ -373,7 +374,7 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 
 			_, ps := mockPolicyWithCore(t, false)
 			ps.policyTypeMap.Store(tc.policyStoreKey, tc.policyStoreValue)
-			got, err := ps.GetNonEGPPolicyType(tc.paramNamespace, tc.paramPolicyName)
+			got, err := ps.GetNonEGPPolicyType(tc.paramPolicyName)
 			if tc.isErrorExpected {
 				require.Error(t, err)
 				require.Nil(t, got)

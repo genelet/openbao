@@ -195,7 +195,8 @@ func TestNewCore_configureLogicalBackends(t *testing.T) {
 
 			core := &Core{}
 			require.Len(t, core.logicalBackends, 0)
-			core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t), tc.adminNamespacePath)
+			//core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t), tc.adminNamespacePath)
+			core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t))
 			require.GreaterOrEqual(t, len(core.logicalBackends), tc.expectedNonEntBackends)
 			require.Contains(t, core.logicalBackends, mountTypeKV)
 			require.Contains(t, core.logicalBackends, mountTypeCubbyhole)
@@ -816,7 +817,8 @@ func TestCore_ShutdownDone(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		err := c.Shutdown()
 		if err != nil {
-			t.Fatal(err)
+			//t.Fatal(err)
+			panic(err)
 		}
 	}()
 
@@ -2758,7 +2760,7 @@ path "secret/*" {
 `
 
 	ps := c.policyStore
-	policy, _ := ParseACLPolicy(namespace.RootNamespace, secretWritingPolicy)
+	policy, _ := ParseACLPolicy(secretWritingPolicy)
 	if err := ps.SetPolicy(namespace.RootContext(nil), policy); err != nil {
 		t.Fatal(err)
 	}
@@ -3272,15 +3274,16 @@ func TestDefaultDeadlock(t *testing.T) {
 	InduceDeadlock(t, testCore, 0)
 }
 
-func RestoreDeadlockOpts() func() {
-	opts := deadlock.Opts
-	return func() {
-		deadlock.Opts = opts
+/*
+	func RestoreDeadlockOpts() func() {
+		opts := deadlock.Opts
+		return func() {
+			deadlock.Opts = opts
+		}
 	}
-}
-
+*/
 func InduceDeadlock(t *testing.T, vaultcore *Core, expected uint32) {
-	defer RestoreDeadlockOpts()()
+	//	defer RestoreDeadlockOpts()()
 	var deadlocks uint32
 	deadlock.Opts.OnPotentialDeadlock = func() {
 		atomic.AddUint32(&deadlocks, 1)

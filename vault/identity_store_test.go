@@ -228,7 +228,7 @@ func TestIdentityStore_EntityIDPassthrough(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = core.router.Mount(noop, "test/backend/", &MountEntry{Path: "test/backend/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor", namespace: namespace.RootNamespace}, view)
+	err = core.router.Mount(noop, "test/backend/", &MountEntry{Path: "test/backend/", Type: "noop", UUID: meUUID, Accessor: "noop-accessor"}, view)
 	if err != nil {
 		t.Fatal(err)
 	}

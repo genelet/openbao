@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openbao/openbao/helper/namespace"
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/versions"
 
 	"github.com/hashicorp/go-multierror"
@@ -26,10 +26,10 @@ func (c *Core) reloadMatchingPluginMounts(ctx context.Context, mounts []string) 
 	c.authLock.RLock()
 	defer c.authLock.RUnlock()
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	var errors error
 	for _, mount := range mounts {
@@ -56,9 +56,9 @@ func (c *Core) reloadMatchingPluginMounts(ctx context.Context, mounts []string) 
 		}
 
 		// We dont reload mounts that are not in the same namespace
-		if ns.ID != entry.Namespace().ID {
-			continue
-		}
+		//if ns.ID != entry.Namespace().ID {
+		//	continue
+		//}
 
 		err := c.reloadBackendCommon(ctx, entry, isAuth)
 		if err != nil {
@@ -79,17 +79,17 @@ func (c *Core) reloadMatchingPlugin(ctx context.Context, pluginName string) erro
 	c.authLock.RLock()
 	defer c.authLock.RUnlock()
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	// Filter mount entries that only matches the plugin name
 	for _, entry := range c.mounts.Entries {
 		// We dont reload mounts that are not in the same namespace
-		if ns.ID != entry.Namespace().ID {
-			continue
-		}
+		//if ns.ID != entry.Namespace().ID {
+		//	continue
+		//}
 		if entry.Type == pluginName || (entry.Type == "plugin" && entry.Config.PluginName == pluginName) {
 			err := c.reloadBackendCommon(ctx, entry, false)
 			if err != nil {
@@ -102,9 +102,9 @@ func (c *Core) reloadMatchingPlugin(ctx context.Context, pluginName string) erro
 	// Filter auth mount entries that ony matches the plugin name
 	for _, entry := range c.auth.Entries {
 		// We dont reload mounts that are not in the same namespace
-		if ns.ID != entry.Namespace().ID {
-			continue
-		}
+		//if ns.ID != entry.Namespace().ID {
+		//	continue
+		//}
 
 		if entry.Type == pluginName || (entry.Type == "plugin" && entry.Config.PluginName == pluginName) {
 			err := c.reloadBackendCommon(ctx, entry, true)
@@ -139,7 +139,8 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	}
 
 	// Fast-path out if the backend doesn't exist
-	raw, ok := c.router.root.Get(entry.Namespace().Path + path)
+	//raw, ok := c.router.root.Get(entry.Namespace().Path + path)
+	raw, ok := c.router.root.Get(path)
 	if !ok {
 		return nil
 	}
@@ -218,27 +219,27 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	// Set the backend back
 	re.backend = backend
 
-	if backend != nil {
-		// Initialize the backend after reload. This is a no-op for backends < v5 which
-		// rely on lazy loading for initialization. v5 backends do not rely on lazy loading
-		// for initialization unless the plugin process is killed. Reload of a v5 backend
-		// results in a new plugin process, so we must initialize the backend here.
-		err := backend.Initialize(ctx, &logical.InitializationRequest{Storage: view})
+	//if backend != nil {
+	// Initialize the backend after reload. This is a no-op for backends < v5 which
+	// rely on lazy loading for initialization. v5 backends do not rely on lazy loading
+	// for initialization unless the plugin process is killed. Reload of a v5 backend
+	// results in a new plugin process, so we must initialize the backend here.
+	err = backend.Initialize(ctx, &logical.InitializationRequest{Storage: view})
+	if err != nil {
+		return err
+	}
+
+	// Set paths as well
+	paths := backend.SpecialPaths()
+	if paths != nil {
+		re.rootPaths.Store(pathsToRadix(paths.Root))
+		loginPathsEntry, err := parseUnauthenticatedPaths(paths.Unauthenticated)
 		if err != nil {
 			return err
 		}
-
-		// Set paths as well
-		paths := backend.SpecialPaths()
-		if paths != nil {
-			re.rootPaths.Store(pathsToRadix(paths.Root))
-			loginPathsEntry, err := parseUnauthenticatedPaths(paths.Unauthenticated)
-			if err != nil {
-				return err
-			}
-			re.loginPaths.Store(loginPathsEntry)
-		}
+		re.loginPaths.Store(loginPathsEntry)
 	}
+	//}
 
 	return nil
 }

@@ -27,7 +27,8 @@ import (
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/identity/mfa"
 	"github.com/openbao/openbao/helper/metricsutil"
-	"github.com/openbao/openbao/helper/namespace"
+
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/internalshared/configutil"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
@@ -71,7 +72,8 @@ type HandlerProperties struct {
 // also returns the cumulative list of policies that the entity is entitled to
 // if skipDeriveEntityPolicies is set to false. This list includes the policies from the
 // entity itself and from all the groups in which the given entity ID is a member of.
-func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, tokenNS *namespace.Namespace, entityID string, skipDeriveEntityPolicies bool) (*identity.Entity, map[string][]string, error) {
+// func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, tokenNS *namespace.Namespace, entityID string, skipDeriveEntityPolicies bool) (*identity.Entity, map[string][]string, error) {
+func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, entityID string, skipDeriveEntityPolicies bool) (*identity.Entity, map[string][]string, error) {
 	if entityID == "" || c.identityStore == nil {
 		return nil, nil, nil
 	}
@@ -111,15 +113,17 @@ func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, tokenNS *names
 			return nil, nil, err
 		}
 
-		policiesByNS, err := c.filterGroupPoliciesByNS(ctx, tokenNS, groupPolicies)
+		policiesByNS, err := c.filterGroupPoliciesByNS(ctx, groupPolicies)
 		if err != nil {
 			return nil, nil, err
 		}
 		for nsID, pss := range policiesByNS {
 			policies[nsID] = append(policies[nsID], pss...)
 		}
+		c.logger.Debug("aaaaaaaaaaaa", "entity policy", entity.Policies, "group policies", groupPolicies, "filtered", policiesByNS, "policies", policies)
 	}
 
+	c.logger.Debug("entity and derived policies fetched successfully", "entity_id", entityID, "policies", policies)
 	return entity, policies, err
 }
 
@@ -128,7 +132,7 @@ func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, tokenNS *names
 // but filtered down to the policies that should apply to the token based on the
 // relationship between the namespace of the token and the namespace of the
 // policy.
-func (c *Core) filterGroupPoliciesByNS(ctx context.Context, tokenNS *namespace.Namespace, groupPolicies map[string][]string) (map[string][]string, error) {
+func (c *Core) filterGroupPoliciesByNS(ctx context.Context, groupPolicies map[string][]string) (map[string][]string, error) {
 	policies := make(map[string][]string)
 
 	policyApplicationMode, err := c.GetGroupPolicyApplicationMode(ctx)
@@ -137,11 +141,14 @@ func (c *Core) filterGroupPoliciesByNS(ctx context.Context, tokenNS *namespace.N
 	}
 
 	for nsID, nsPolicies := range groupPolicies {
-		filteredPolicies, err := c.getApplicableGroupPolicies(ctx, tokenNS, nsID, nsPolicies, policyApplicationMode)
+		c.logger.Debug("filtering 0001", "ns_id", nsID, "policies", nsPolicies, "mode", policyApplicationMode)
+		filteredPolicies, err := c.getApplicableGroupPolicies(ctx, nsPolicies, policyApplicationMode)
 		if err != nil && err != ErrNoApplicablePolicies {
 			return nil, err
 		}
+		c.Logger().Trace("filtered 0002", "ns_id", nsID, "policies", filteredPolicies)
 		filteredPolicies = strutil.RemoveDuplicates(filteredPolicies, false)
+		c.Logger().Trace("filtered 0003", "ns_id", nsID, "policies", filteredPolicies)
 		if len(filteredPolicies) != 0 {
 			policies[nsID] = append(policies[nsID], filteredPolicies...)
 		}
@@ -153,32 +160,39 @@ func (c *Core) filterGroupPoliciesByNS(ctx context.Context, tokenNS *namespace.N
 // getApplicableGroupPolicies returns a slice of group policies that should
 // apply to the token based on the group policy application mode,
 // and the relationship between the token namespace and the group namespace.
-func (c *Core) getApplicableGroupPolicies(ctx context.Context, tokenNS *namespace.Namespace, nsID string, nsPolicies []string, policyApplicationMode string) ([]string, error) {
-	policyNS, err := NamespaceByID(ctx, nsID, c)
-	if err != nil {
-		return nil, err
+// func (c *Core) getApplicableGroupPolicies(ctx context.Context, tokenNS *namespace.Namespace, nsID string, nsPolicies []string, policyApplicationMode string) ([]string, error) {
+func (c *Core) getApplicableGroupPolicies(_ context.Context, nsPolicies []string, policyApplicationMode string) ([]string, error) {
+	// policy used to have namespace, so the old code checks if the 2 namespaces are the same.
+	// here we assume they are the same, at the time this function is called.
+	if policyApplicationMode == groupPolicyApplicationModeWithinNamespaceHierarchy {
+		return nsPolicies, nil
 	}
-	if policyNS == nil {
-		return nil, namespace.ErrNoNamespace
-	}
+
+	//policyNS, err := NamespaceByID(ctx, nsID, c)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if policyNS == nil {
+	//	return nil, namespace.ErrNoNamespace
+	//}
 
 	var filteredPolicies []string
 
-	if tokenNS.Path == policyNS.Path {
-		// Same namespace - add all and continue
-		for _, policyName := range nsPolicies {
-			filteredPolicies = append(filteredPolicies, policyName)
-		}
-		return filteredPolicies, nil
-	}
+	//if tokenNS.Path == policyNS.Path {
+	// Same namespace - add all and continue
+	//	for _, policyName := range nsPolicies {
+	//		filteredPolicies = append(filteredPolicies, policyName)
+	//	}
+	//	return filteredPolicies, nil
+	//}
 
 	for _, policyName := range nsPolicies {
-		t, err := c.policyStore.GetNonEGPPolicyType(policyNS.ID, policyName)
+		t, err := c.policyStore.GetNonEGPPolicyType(policyName)
 		if err != nil && errors.Is(err, ErrPolicyNotExistInTypeMap) {
 			// When we attempt to get a non-EGP policy type, and receive an
 			// explicit error that it doesn't exist (in the type map) we log the
 			// ns/policy and continue without error.
-			c.Logger().Debug(fmt.Errorf("%w: %v/%v", err, policyNS.ID, policyName).Error())
+			c.Logger().Debug(fmt.Errorf("%w: %v", err, policyName).Error())
 			continue
 		}
 		if err != nil || t == nil {
@@ -194,9 +208,9 @@ func (c *Core) getApplicableGroupPolicies(ctx context.Context, tokenNS *namespac
 				filteredPolicies = append(filteredPolicies, policyName)
 				continue
 			}
-			if policyNS.HasParent(tokenNS) {
-				filteredPolicies = append(filteredPolicies, policyName)
-			}
+			//if policyNS.HasParent(tokenNS) {
+			//	filteredPolicies = append(filteredPolicies, policyName)
+			//}
 		default:
 			return nil, fmt.Errorf("unexpected policy type: %v", t)
 		}
@@ -266,18 +280,19 @@ func (c *Core) fetchACLTokenEntryAndEntity(ctx context.Context, req *logical.Req
 	// Add tokens policies
 	policyNames[te.NamespaceID] = append(policyNames[te.NamespaceID], te.Policies...)
 
-	tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
-	if err != nil {
-		c.logger.Error("failed to fetch token namespace", "error", err)
-		return nil, nil, nil, nil, ErrInternalError
-	}
-	if tokenNS == nil {
-		c.logger.Error("failed to fetch token namespace", "error", namespace.ErrNoNamespace)
-		return nil, nil, nil, nil, ErrInternalError
-	}
+	//tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
+	//if err != nil {
+	//	c.logger.Error("failed to fetch token namespace", "error", err)
+	//	return nil, nil, nil, nil, ErrInternalError
+	//}
+	//if tokenNS == nil {
+	//	c.logger.Error("failed to fetch token namespace", "error", namespace.ErrNoNamespace)
+	//	return nil, nil, nil, nil, ErrInternalError
+	//}
 
 	// Add identity policies from all the namespaces
-	entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
+	//entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
+	entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, te.EntityID, te.NoIdentityPolicies)
 	if err != nil {
 		return nil, nil, nil, nil, ErrInternalError
 	}
@@ -288,24 +303,28 @@ func (c *Core) fetchACLTokenEntryAndEntity(ctx context.Context, req *logical.Req
 	// Attach token's namespace information to the context. Wrapping tokens by
 	// should be able to be used anywhere, so we also special case behavior.
 	var tokenCtx context.Context
-	if len(policyNames) == 1 &&
-		len(policyNames[te.NamespaceID]) == 1 &&
-		policyNames[te.NamespaceID][0] == responseWrappingPolicyName &&
-		(strings.HasSuffix(req.Path, "sys/wrapping/unwrap") ||
-			strings.HasSuffix(req.Path, "sys/wrapping/lookup") ||
-			strings.HasSuffix(req.Path, "sys/wrapping/rewrap")) {
-		// Use the request namespace; will find the copy of the policy for the
-		// local namespace
-		tokenCtx = ctx
-	} else {
-		// Use the token's namespace for looking up policy
-		tokenCtx = namespace.ContextWithNamespace(ctx, tokenNS)
-	}
+	tokenCtx = ctx
+	/*
+		if len(policyNames) == 1 &&
+			len(policyNames[te.NamespaceID]) == 1 &&
+			policyNames[te.NamespaceID][0] == responseWrappingPolicyName &&
+			(strings.HasSuffix(req.Path, "sys/wrapping/unwrap") ||
+				strings.HasSuffix(req.Path, "sys/wrapping/lookup") ||
+				strings.HasSuffix(req.Path, "sys/wrapping/rewrap")) {
+			// Use the request namespace; will find the copy of the policy for the
+			// local namespace
+			tokenCtx = ctx
+		} else {
+			// Use the token's namespace for looking up policy
+			//tokenCtx = namespace.ContextWithNamespace(ctx, tokenNS)
+			tokenCtx = ctx
+		}
+	*/
 
 	// Add the inline policy if it's set
 	policies := make([]*Policy, 0)
 	if te.InlinePolicy != "" {
-		inlinePolicy, err := ParseACLPolicy(tokenNS, te.InlinePolicy)
+		inlinePolicy, err := ParseACLPolicy(te.InlinePolicy)
 		if err != nil {
 			return nil, nil, nil, nil, ErrInternalError
 		}
@@ -507,13 +526,13 @@ func (c *Core) switchedLockHandleRequest(httpCtx context.Context, req *logical.R
 		}
 	}(ctx, httpCtx)
 
-	ns, err := namespace.FromContext(httpCtx)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("could not parse namespace from http context: %w", err)
-	}
+	//ns, err := namespace.FromContext(httpCtx)
+	//if err != nil {
+	//	cancel()
+	//	return nil, fmt.Errorf("could not parse namespace from http context: %w", err)
+	//}
 
-	ctx = namespace.ContextWithNamespace(ctx, ns)
+	//ctx = namespace.ContextWithNamespace(ctx, ns)
 	inFlightReqID, ok := httpCtx.Value(logical.CtxKeyInFlightRequestID{}).(string)
 	if ok {
 		ctx = context.WithValue(ctx, logical.CtxKeyInFlightRequestID{}, inFlightReqID)
@@ -555,10 +574,10 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse namespace from http context: %w", err)
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not parse namespace from http context: %w", err)
+	//}
 	var requestBodyToken string
 	var returnRequestAuthToken bool
 
@@ -571,14 +590,14 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		te := req.TokenEntry()
 		newCtx := ctx
 		if te != nil {
-			ns, err := NamespaceByID(ctx, te.NamespaceID, c)
-			if err != nil {
-				c.Logger().Warn("error looking up namespace from the token's namespace ID", "error", err)
-				return nil, err
-			}
-			if ns != nil {
-				newCtx = namespace.ContextWithNamespace(ctx, ns)
-			}
+			//ns, err := NamespaceByID(ctx, te.NamespaceID, c)
+			//if err != nil {
+			//	c.Logger().Warn("error looking up namespace from the token's namespace ID", "error", err)
+			//	return nil, err
+			//}
+			//if ns != nil {
+			//	newCtx = namespace.ContextWithNamespace(ctx, ns)
+			//}
 		}
 		switch req.Path {
 		// Route the token wrapping request to its respective sys NS
@@ -633,17 +652,19 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 				}
 				req.Data["token"] = token
 			}
-			_, nsID := namespace.SplitIDFromString(token.(string))
-			if nsID != "" {
-				ns, err := NamespaceByID(ctx, nsID, c)
-				if err != nil {
-					c.Logger().Warn("error looking up namespace from the token's namespace ID", "error", err)
-					return nil, err
+			/*
+				_, nsID := namespace.SplitIDFromString(token.(string))
+				if nsID != "" {
+					ns, err := NamespaceByID(ctx, nsID, c)
+					if err != nil {
+						c.Logger().Warn("error looking up namespace from the token's namespace ID", "error", err)
+						return nil, err
+					}
+					if ns != nil {
+						ctx = namespace.ContextWithNamespace(ctx, ns)
+					}
 				}
-				if ns != nil {
-					ctx = namespace.ContextWithNamespace(ctx, ns)
-				}
-			}
+			*/
 		}
 
 	// The following relative sys/leases/ paths handles re-routing requests
@@ -659,17 +680,19 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 			if !ok || leaseID == nil {
 				break
 			}
-			_, nsID := namespace.SplitIDFromString(leaseID.(string))
-			if nsID != "" {
-				ns, err := NamespaceByID(ctx, nsID, c)
-				if err != nil {
-					c.Logger().Warn("error looking up namespace from the lease's namespace ID", "error", err)
-					return nil, err
+			/*
+				_, nsID := namespace.SplitIDFromString(leaseID.(string))
+				if nsID != "" {
+					ns, err := NamespaceByID(ctx, nsID, c)
+					if err != nil {
+						c.Logger().Warn("error looking up namespace from the lease's namespace ID", "error", err)
+						return nil, err
+					}
+					if ns != nil {
+						ctx = namespace.ContextWithNamespace(ctx, ns)
+					}
 				}
-				if ns != nil {
-					ctx = namespace.ContextWithNamespace(ctx, ns)
-				}
-			}
+			*/
 		}
 
 	// Prevent any metrics requests to be forwarded from a standby node.
@@ -681,16 +704,16 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		}
 	}
 
-	ns, err = namespace.FromContext(ctx)
-	if err != nil {
-		return nil, errwrap.Wrapf("could not parse namespace from http context: {{err}}", err)
-	}
+	//ns, err = namespace.FromContext(ctx)
+	//if err != nil {
+	//	return nil, errwrap.Wrapf("could not parse namespace from http context: {{err}}", err)
+	//}
 
-	if ns.Path != "" {
-		// oss start
-		// return nil, logical.CodedError(403, "namespaces feature not enabled")
-		// oss end
-	}
+	//if ns.Path != "" {
+	// oss start
+	// return nil, logical.CodedError(403, "namespaces feature not enabled")
+	// oss end
+	//}
 
 	var auth *logical.Auth
 	if c.isLoginRequest(ctx, req) {
@@ -853,12 +876,12 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		}
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		c.logger.Error("failed to get namespace from context", "error", err)
-		retErr = multierror.Append(retErr, ErrInternalError)
-		return
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	c.logger.Error("failed to get namespace from context", "error", err)
+	//	retErr = multierror.Append(retErr, ErrInternalError)
+	//	return
+	//}
 
 	// Validate the token
 	auth, te, ctErr := c.CheckToken(ctx, req, false)
@@ -897,7 +920,8 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 			// valid request (this is the token's final use). We pass the ID in
 			// directly just to be safe in case something else modifies te later.
 			defer func(id string) {
-				nsActiveCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+				//nsActiveCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+				nsActiveCtx := c.activeContext
 				leaseID, err := c.expiration.CreateOrFetchRevocationLeaseByToken(nsActiveCtx, te)
 				if err == nil {
 					err = c.expiration.LazyRevoke(ctx, leaseID)
@@ -1084,15 +1108,16 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 
 			// Count the lease creation
 			ttl_label := metricsutil.TTLBucket(resp.Secret.TTL)
-			mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
+			//mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
+			mountPointWithoutNs := req.MountPoint
 			c.MetricSink().IncrCounterWithLabels(
 				[]string{"secret", "lease", "creation"},
 				1,
 				[]metrics.Label{
-					metricsutil.NamespaceLabel(ns),
-					{"secret_engine", req.MountType},
-					{"mount_point", mountPointWithoutNs},
-					{"creation_ttl", ttl_label},
+					//metricsutil.NamespaceLabel(ns),
+					{Name: "secret_engine", Value: req.MountType},
+					{Name: "mount_point", Value: mountPointWithoutNs},
+					{Name: "creation_ttl", Value: ttl_label},
 				},
 			)
 		}
@@ -1108,19 +1133,20 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 		}
 
 		// Fetch the namespace to which the token belongs
-		tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
-		if err != nil {
-			c.logger.Error("failed to fetch token's namespace", "error", err)
-			retErr = multierror.Append(retErr, err)
-			return nil, auth, retErr
-		}
-		if tokenNS == nil {
-			c.logger.Error(namespace.ErrNoNamespace.Error())
-			retErr = multierror.Append(retErr, namespace.ErrNoNamespace)
-			return nil, auth, retErr
-		}
-
-		_, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, resp.Auth.EntityID, false)
+		/*
+			tokenNS, err := NamespaceByID(ctx, te.NamespaceID, c)
+			if err != nil {
+				c.logger.Error("failed to fetch token's namespace", "error", err)
+				retErr = multierror.Append(retErr, err)
+				return nil, auth, retErr
+			}
+			if tokenNS == nil {
+				c.logger.Error(namespace.ErrNoNamespace.Error())
+				retErr = multierror.Append(retErr, namespace.ErrNoNamespace)
+				return nil, auth, retErr
+			}
+		*/
+		_, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, resp.Auth.EntityID, false)
 		if err != nil {
 			// Best-effort clean up on error, so we log the cleanup error as a
 			// warning but still return as internal error.
@@ -1148,10 +1174,10 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 			case logical.TokenTypeBatch:
 			case logical.TokenTypeService:
 				registeredTokenEntry := &logical.TokenEntry{
-					TTL:         auth.TTL,
-					Policies:    auth.TokenPolicies,
-					Path:        resp.Auth.CreationPath,
-					NamespaceID: ns.ID,
+					TTL:      auth.TTL,
+					Policies: auth.TokenPolicies,
+					Path:     resp.Auth.CreationPath,
+					//NamespaceID: ns.ID,
 				}
 
 				// Only logins apply to role based quotas, so we can omit the role here, as we are not logging in.
@@ -1364,12 +1390,12 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 		return nil, nil, ErrInternalError
 	}
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		c.logger.Error("failed to get namespace from context", "error", err)
-		retErr = multierror.Append(retErr, ErrInternalError)
-		return
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	c.logger.Error("failed to get namespace from context", "error", err)
+	//	retErr = multierror.Append(retErr, ErrInternalError)
+	//	return
+	//}
 	// If the response generated an authentication, then generate the token
 	if resp != nil && resp.Auth != nil && req.Path != "sys/mfa/validate" {
 		// Check for request role in context to role based quotas
@@ -1431,7 +1457,7 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 		source := c.router.MatchingMount(ctx, req.Path)
 
 		// Login MFA
-		entity, _, err := c.fetchEntityAndDerivedPolicies(ctx, ns, auth.EntityID, true)
+		entity, _, err := c.fetchEntityAndDerivedPolicies(ctx, auth.EntityID, true)
 		if err != nil {
 			return nil, nil, ErrInternalError
 		}
@@ -1495,10 +1521,10 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 				// response. This flag is indicate to store the auth response for later
 				// and return MFARequirement only
 				respAuth := &MFACachedAuthResponse{
-					CachedAuth:            resp.Auth,
-					RequestPath:           req.Path,
-					RequestNSID:           ns.ID,
-					RequestNSPath:         ns.Path,
+					CachedAuth:  resp.Auth,
+					RequestPath: req.Path,
+					//RequestNSID:           ns.ID,
+					//RequestNSPath:         ns.Path,
 					RequestConnRemoteAddr: req.Connection.RemoteAddr, // this is needed for the DUO method
 					TimeOfStorage:         time.Now(),
 					RequestID:             mfaRequestID,
@@ -1535,7 +1561,7 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 			role = c.DetermineRoleFromLoginRequest(ctx, req.MountPoint, req.Data)
 		}
 
-		_, respTokenCreate, errCreateToken := c.LoginCreateToken(ctx, ns, req.Path, source, role, resp)
+		_, respTokenCreate, errCreateToken := c.LoginCreateToken(ctx, req.Path, source, role, resp)
 		if errCreateToken != nil {
 			return respTokenCreate, nil, errCreateToken
 		}
@@ -1581,7 +1607,8 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 // LoginCreateToken creates a token as a result of a login request.
 // If MFA is enforced, mfa/validate endpoint calls this functions
 // after successful MFA validation to generate the token.
-func (c *Core) LoginCreateToken(ctx context.Context, ns *namespace.Namespace, reqPath, mountPoint, role string, resp *logical.Response) (bool, *logical.Response, error) {
+// func (c *Core) LoginCreateToken(ctx context.Context, ns *namespace.Namespace, reqPath, mountPoint, role string, resp *logical.Response) (bool, *logical.Response, error) {
+func (c *Core) LoginCreateToken(ctx context.Context, reqPath, mountPoint, role string, resp *logical.Response) (bool, *logical.Response, error) {
 	auth := resp.Auth
 	source := strings.TrimPrefix(mountPoint, credentialRoutePrefix)
 	source = strings.ReplaceAll(source, "/", "-")
@@ -1609,13 +1636,14 @@ func (c *Core) LoginCreateToken(ctx context.Context, ns *namespace.Namespace, re
 		resp.AddWarning(warning)
 	}
 
-	_, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, ns, auth.EntityID, false)
+	_, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, auth.EntityID, false)
 	if err != nil {
 		return false, nil, ErrInternalError
 	}
 
 	auth.TokenPolicies = policyutil.SanitizePolicies(auth.Policies, !auth.NoDefaultPolicy)
-	allPolicies := policyutil.SanitizePolicies(append(auth.TokenPolicies, identityPolicies[ns.ID]...), policyutil.DoNotAddDefaultPolicy)
+	//allPolicies := policyutil.SanitizePolicies(append(auth.TokenPolicies, identityPolicies[ns.ID]...), policyutil.DoNotAddDefaultPolicy)
+	allPolicies := policyutil.SanitizePolicies(auth.TokenPolicies, policyutil.DoNotAddDefaultPolicy)
 
 	// Prevent internal policies from being assigned to tokens. We check
 	// this on auth.Policies including derived ones from Identity before
@@ -1642,24 +1670,26 @@ func (c *Core) LoginCreateToken(ctx context.Context, ns *namespace.Namespace, re
 		return false, logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
 	}
 
-	auth.IdentityPolicies = policyutil.SanitizePolicies(identityPolicies[ns.ID], policyutil.DoNotAddDefaultPolicy)
-	delete(identityPolicies, ns.ID)
+	//auth.IdentityPolicies = policyutil.SanitizePolicies(identityPolicies[ns.ID], policyutil.DoNotAddDefaultPolicy)
+	auth.IdentityPolicies = policyutil.SanitizePolicies([]string{}, policyutil.DoNotAddDefaultPolicy)
+	//delete(identityPolicies, ns.ID)
 	auth.ExternalNamespacePolicies = identityPolicies
 	auth.Policies = allPolicies
 
 	// Count the successful token creation
 	ttl_label := metricsutil.TTLBucket(tokenTTL)
 	// Do not include namespace path in mount point; already present as separate label.
-	mountPointWithoutNs := ns.TrimmedPath(mountPoint)
+	//mountPointWithoutNs := ns.TrimmedPath(mountPoint)
+	mountPointWithoutNs := mountPoint
 	c.metricSink.IncrCounterWithLabels(
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			metricsutil.NamespaceLabel(ns),
-			{"auth_method", mountEntry.Type},
-			{"mount_point", mountPointWithoutNs},
-			{"creation_ttl", ttl_label},
-			{"token_type", auth.TokenType.String()},
+			//metricsutil.NamespaceLabel(ns),
+			{Name: "auth_method", Value: mountEntry.Type},
+			{Name: "mount_point", Value: mountPointWithoutNs},
+			{Name: "creation_ttl", Value: ttl_label},
+			{Name: "token_type", Value: auth.TokenType.String()},
 		},
 	)
 
@@ -1780,11 +1810,12 @@ func (c *Core) isUserLocked(ctx context.Context, mountEntry *MountEntry, req *lo
 	switch userFailedLoginInfo {
 	case nil:
 		// entry not found in userFailedLoginInfo map, check storage to re-verify
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return false, fmt.Errorf("could not parse namespace from http context: %w", err)
-		}
-		storageUserLockoutPath := fmt.Sprintf(coreLockedUsersPath+"%s/%s/%s", ns.ID, loginUserInfoKey.mountAccessor, loginUserInfoKey.aliasName)
+		//ns, err := namespace.FromContext(ctx)
+		//if err != nil {
+		//	return false, fmt.Errorf("could not parse namespace from http context: %w", err)
+		//}
+		//storageUserLockoutPath := fmt.Sprintf(coreLockedUsersPath+"%s/%s/%s", ns.ID, loginUserInfoKey.mountAccessor, loginUserInfoKey.aliasName)
+		storageUserLockoutPath := fmt.Sprintf(coreLockedUsersPath+"%s/%s", loginUserInfoKey.mountAccessor, loginUserInfoKey.aliasName)
 		existingEntry, err := c.barrier.Get(ctx, storageUserLockoutPath)
 		if err != nil {
 			return false, err
@@ -1939,21 +1970,22 @@ func (c *Core) RegisterAuth(ctx context.Context, tokenTTL time.Duration, path st
 	// that information to the user.
 
 	// Generate a token
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	var err error
 	te := logical.TokenEntry{
-		Path:           path,
-		Meta:           auth.Metadata,
-		DisplayName:    auth.DisplayName,
-		CreationTime:   time.Now().Unix(),
-		TTL:            tokenTTL,
-		NumUses:        auth.NumUses,
-		EntityID:       auth.EntityID,
-		BoundCIDRs:     auth.BoundCIDRs,
-		Policies:       auth.TokenPolicies,
-		NamespaceID:    ns.ID,
+		Path:         path,
+		Meta:         auth.Metadata,
+		DisplayName:  auth.DisplayName,
+		CreationTime: time.Now().Unix(),
+		TTL:          tokenTTL,
+		NumUses:      auth.NumUses,
+		EntityID:     auth.EntityID,
+		BoundCIDRs:   auth.BoundCIDRs,
+		Policies:     auth.TokenPolicies,
+		//NamespaceID:    ns.ID,
 		ExplicitMaxTTL: auth.ExplicitMaxTTL,
 		Period:         auth.Period,
 		Type:           auth.TokenType,
@@ -2035,14 +2067,14 @@ func (c *Core) LocalUpdateUserFailedLoginInfo(ctx context.Context, userKey Faile
 		mountEntry := c.router.MatchingMountByAccessor(userKey.mountAccessor)
 		if mountEntry == nil {
 			mountEntry = &MountEntry{}
-			mountEntry.NamespaceID = namespace.RootNamespaceID
+			//mountEntry.NamespaceID = namespace.RootNamespaceID
 		}
 		userLockoutConfiguration := c.getUserLockoutConfiguration(mountEntry)
 
 		// if failed login count has reached threshold, create a storage entry as the user got locked
 		if failedLoginInfo.count >= uint(userLockoutConfiguration.LockoutThreshold) {
 			// user locked
-			storageUserLockoutPath := fmt.Sprintf(coreLockedUsersPath+"%s/%s/%s", mountEntry.NamespaceID, userKey.mountAccessor, userKey.aliasName)
+			storageUserLockoutPath := fmt.Sprintf(coreLockedUsersPath+"%s/%s", userKey.mountAccessor, userKey.aliasName)
 
 			compressedBytes, err := jsonutil.EncodeJSONAndCompress(failedLoginInfo.lastFailedLoginTime, nil)
 			if err != nil {
@@ -2207,7 +2239,7 @@ func (c *Core) DecodeSSCTokenInternal(token string) (*tokens.Token, error) {
 	return plainToken, nil
 }
 
-func (c *Core) checkSSCTokenInternal(ctx context.Context, token string) (string, error) {
+func (c *Core) checkSSCTokenInternal(_ context.Context, token string) (string, error) {
 	signedToken := &tokens.SignedToken{}
 
 	// Skip batch and old style service tokens. These can have the prefix "b.",

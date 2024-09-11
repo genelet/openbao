@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/go-uuid"
 	"github.com/openbao/openbao/builtin/plugin"
-	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/versions"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -90,28 +89,29 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 	}
 	defer unlock()
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-	entry.NamespaceID = ns.ID
-	entry.namespace = ns
+	var err error
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//entry.NamespaceID = ns.ID
+	//entry.namespace = ns
 
 	// Populate cache
-	NamespaceByID(ctx, ns.ID, c)
+	//NamespaceByID(ctx, ns.ID, c)
 
 	// Basic check for matching names
 	for _, ent := range c.auth.Entries {
-		if ns.ID == ent.NamespaceID {
-			switch {
-			// Existing is oauth/github/ new is oauth/ or
-			// existing is oauth/ and new is oauth/github/
-			case strings.HasPrefix(ent.Path, entry.Path):
-				fallthrough
-			case strings.HasPrefix(entry.Path, ent.Path):
-				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
-			}
+		//	if ns.ID == ent.NamespaceID {
+		switch {
+		// Existing is oauth/github/ new is oauth/ or
+		// existing is oauth/ and new is oauth/github/
+		case strings.HasPrefix(ent.Path, entry.Path):
+			fallthrough
+		case strings.HasPrefix(entry.Path, ent.Path):
+			return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
 		}
+		//	}
 	}
 
 	// Ensure the token backend is a singleton
@@ -238,14 +238,15 @@ func (c *Core) disableCredential(ctx context.Context, path string) error {
 func (c *Core) disableCredentialInternal(ctx context.Context, path string, updateStorage bool) error {
 	path = credentialRoutePrefix + path
 
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
-	}
+	//ns, err := namespace.FromContext(ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	// Verify exact match of the route
 	match := c.router.MatchingMount(ctx, path)
-	if match == "" || ns.Path+path != match {
+	//if match == "" || ns.Path+path != match {
+	if match == "" || path != match {
 		return fmt.Errorf("no matching mount")
 	}
 
@@ -260,7 +261,7 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	backend := c.router.MatchingBackend(ctx, path)
 
 	// Mark the entry as tainted
-	if err := c.taintCredEntry(ctx, ns.ID, path, updateStorage); err != nil {
+	if err := c.taintCredEntry(ctx, path, updateStorage); err != nil {
 		return err
 	}
 
@@ -271,11 +272,12 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 
 	if c.expiration != nil && backend != nil {
 		// Revoke credentials from this path
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return err
-		}
-		revokeCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+		//ns, err := namespace.FromContext(ctx)
+		//if err != nil {
+		//	return err
+		//}
+		//revokeCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+		revokeCtx := ctx
 		if err := c.expiration.RevokePrefix(revokeCtx, path, true); err != nil {
 			return err
 		}
@@ -291,7 +293,8 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 		// Don't attempt to clear data, replication will handle this
 	default:
 		// Have writable storage, remove the whole thing
-		if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("auth.deletion").With("namespace", ns.ID, "path", path)); err != nil {
+		//if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("auth.deletion").With("namespace", ns.ID, "path", path)); err != nil {
+		if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("auth.deletion").With("path", path)); err != nil {
 			c.logger.Error("failed to clear view for path being unmounted", "error", err, "path", path)
 			return err
 		}
@@ -308,7 +311,8 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	}
 
 	if c.quotaManager != nil {
-		if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
+		//if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
+		if err := c.quotaManager.HandleBackendDisabling(ctx, path); err != nil {
 			c.logger.Error("failed to update quotas after disabling auth", "path", path, "error", err)
 			return err
 		}
@@ -349,39 +353,39 @@ func (c *Core) removeCredEntry(ctx context.Context, path string, updateStorage b
 	return nil
 }
 
-func (c *Core) remountCredential(ctx context.Context, src, dst namespace.MountPathDetails, updateStorage bool) error {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil {
-		return err
+func (c *Core) remountCredential(ctx context.Context, src, dst string, updateStorage bool) error {
+	//	ns, err := namespace.FromContext(ctx)
+	//	if err != nil {
+	//		return err
+	//	}
+
+	if !strings.HasPrefix(src, credentialRoutePrefix) {
+		return fmt.Errorf("cannot remount non-auth mount %q", src)
 	}
 
-	if !strings.HasPrefix(src.MountPath, credentialRoutePrefix) {
-		return fmt.Errorf("cannot remount non-auth mount %q", src.MountPath)
-	}
-
-	if !strings.HasPrefix(dst.MountPath, credentialRoutePrefix) {
-		return fmt.Errorf("cannot remount auth mount to non-auth mount %q", dst.MountPath)
+	if !strings.HasPrefix(dst, credentialRoutePrefix) {
+		return fmt.Errorf("cannot remount auth mount to non-auth mount %q", dst)
 	}
 
 	for _, auth := range protectedAuths {
-		if strings.HasPrefix(src.MountPath, auth) {
-			return fmt.Errorf("cannot remount %q", src.MountPath)
+		if strings.HasPrefix(src, auth) {
+			return fmt.Errorf("cannot remount %q", src)
 		}
 	}
 
 	for _, auth := range protectedAuths {
-		if strings.HasPrefix(dst.MountPath, auth) {
-			return fmt.Errorf("cannot remount to %q", dst.MountPath)
+		if strings.HasPrefix(dst, auth) {
+			return fmt.Errorf("cannot remount to %q", dst)
 		}
 	}
 
-	srcRelativePath := src.GetRelativePath(ns)
-	dstRelativePath := dst.GetRelativePath(ns)
+	srcRelativePath := src
+	dstRelativePath := dst
 
 	// Verify exact match of the route
 	srcMatch := c.router.MatchingMountEntry(ctx, srcRelativePath)
 	if srcMatch == nil {
-		return fmt.Errorf("no matching mount at %q", src.Namespace.Path+src.MountPath)
+		return fmt.Errorf("no matching mount at %q", src)
 	}
 
 	if match := c.router.MountConflict(ctx, dstRelativePath); match != "" {
@@ -389,7 +393,7 @@ func (c *Core) remountCredential(ctx context.Context, src, dst namespace.MountPa
 	}
 
 	// Mark the entry as tainted
-	if err := c.taintCredEntry(ctx, src.Namespace.ID, src.MountPath, updateStorage); err != nil {
+	if err := c.taintCredEntry(ctx, src, updateStorage); err != nil {
 		return err
 	}
 
@@ -399,9 +403,10 @@ func (c *Core) remountCredential(ctx context.Context, src, dst namespace.MountPa
 	}
 
 	if c.expiration != nil {
-		revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
+		//revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
+		revokeCtx := ctx
 		// Revoke all the dynamic keys
-		if err := c.expiration.RevokePrefix(revokeCtx, src.MountPath, true); err != nil {
+		if err := c.expiration.RevokePrefix(revokeCtx, src, true); err != nil {
 			return err
 		}
 	}
@@ -413,10 +418,10 @@ func (c *Core) remountCredential(ctx context.Context, src, dst namespace.MountPa
 	}
 
 	srcMatch.Tainted = false
-	srcMatch.NamespaceID = dst.Namespace.ID
-	srcMatch.namespace = dst.Namespace
+	//srcMatch.NamespaceID = dst.Namespace.ID
+	//srcMatch.namespace = dst.Namespace
 	srcPath := srcMatch.Path
-	srcMatch.Path = strings.TrimPrefix(dst.MountPath, credentialRoutePrefix)
+	srcMatch.Path = strings.TrimPrefix(dst, credentialRoutePrefix)
 
 	// Update the mount table
 	if err := c.persistAuth(ctx, c.auth, &srcMatch.Local); err != nil {
@@ -470,21 +475,22 @@ func (c *Core) remountCredEntryForceInternal(ctx context.Context, path string, u
 }
 
 // taintCredEntry is used to mark an entry in the auth table as tainted
-func (c *Core) taintCredEntry(ctx context.Context, nsID, path string, updateStorage bool) error {
+// func (c *Core) taintCredEntry(ctx context.Context, nsID, path string, updateStorage bool) error {
+func (c *Core) taintCredEntry(ctx context.Context, path string, updateStorage bool) error {
 	c.authLock.Lock()
 	defer c.authLock.Unlock()
 
 	// Taint the entry from the auth table
 	// We do this on the original since setting the taint operates
 	// on the entries which a shallow clone shares anyways
-	entry, err := c.auth.setTaint(nsID, strings.TrimPrefix(path, credentialRoutePrefix), true, mountStateUnmounting)
+	entry, err := c.auth.setTaint(strings.TrimPrefix(path, credentialRoutePrefix), true, mountStateUnmounting)
 	if err != nil {
 		return err
 	}
 
 	// Ensure there was a match
 	if entry == nil {
-		return fmt.Errorf("no matching backend for path %q namespaceID %q", path, nsID)
+		return fmt.Errorf("no matching backend for path %q", path)
 	}
 
 	if updateStorage {
@@ -578,18 +584,19 @@ func (c *Core) loadCredentials(ctx context.Context) error {
 			needPersist = true
 		}
 
-		if entry.NamespaceID == "" {
-			entry.NamespaceID = namespace.RootNamespaceID
-			needPersist = true
-		}
-		ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
-		if err != nil {
-			return err
-		}
-		if ns == nil {
-			return namespace.ErrNoNamespace
-		}
-		entry.namespace = ns
+		//if entry.NamespaceID == "" {
+		//	entry.NamespaceID = namespace.RootNamespaceID
+		// OSS Online
+		//	needPersist = true
+		//}
+		//ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
+		//if err != nil {
+		//	return err
+		//}
+		//if ns == nil {
+		//	return namespace.ErrNoNamespace
+		//}
+		//entry.namespace = ns
 
 		// Sync values to the cache
 		entry.SyncCache()
@@ -771,20 +778,20 @@ func (c *Core) setupCredentials(ctx context.Context) error {
 		path := credentialRoutePrefix + entry.Path
 		err = c.router.Mount(backend, path, entry, view)
 		if err != nil {
-			c.logger.Error("failed to mount auth entry", "path", entry.Path, "namespace", entry.Namespace(), "error", err)
+			c.logger.Error("failed to mount auth entry", "path", entry.Path, "error", err)
 			return errLoadAuthFailed
 		}
 
 		if c.logger.IsInfo() {
-			c.logger.Info("successfully mounted", "type", entry.Type, "version", entry.RunningVersion, "path", entry.Path, "namespace", entry.Namespace())
+			c.logger.Info("successfully mounted", "type", entry.Type, "version", entry.RunningVersion, "path", entry.Path)
 		}
 
 		// Ensure the path is tainted if set in the mount table
 		if entry.Tainted {
 			// Calculate any namespace prefixes here, because when Taint() is called, there won't be
 			// a namespace to pull from the context. This is similar to what we do above in c.router.Mount().
-			path = entry.Namespace().Path + path
-			c.logger.Debug("tainting a mount due to it being marked as tainted in mount table", "entry.path", entry.Path, "entry.namespace.path", entry.Namespace().Path, "full_path", path)
+			//path = entry.Namespace().Path + path
+			c.logger.Debug("tainting a mount due to it being marked as tainted in mount table", "entry.path", entry.Path, "full_path", path)
 			c.router.Taint(ctx, path)
 		}
 
@@ -802,7 +809,7 @@ func (c *Core) setupCredentials(ctx context.Context) error {
 		}
 
 		// Populate cache
-		NamespaceByID(ctx, entry.NamespaceID, c)
+		//NamespaceByID(ctx, entry.NamespaceID, c)
 
 		// Initialize
 		// Bind locally
@@ -836,7 +843,8 @@ func (c *Core) teardownCredentials(ctx context.Context) error {
 	if c.auth != nil {
 		authTable := c.auth.shallowClone()
 		for _, e := range authTable.Entries {
-			backend := c.router.MatchingBackend(namespace.ContextWithNamespace(ctx, e.namespace), credentialRoutePrefix+e.Path)
+			//backend := c.router.MatchingBackend(namespace.ContextWithNamespace(ctx, e.namespace), credentialRoutePrefix+e.Path)
+			backend := c.router.MatchingBackend(ctx, credentialRoutePrefix+e.Path)
 			if backend != nil {
 				backend.Cleanup(ctx)
 			}

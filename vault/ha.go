@@ -460,7 +460,7 @@ func (c *Core) runStandby(doneCh, manualStepDownCh, stopCh chan struct{}) {
 // waitForLeadership is a long running routine that is used when an HA backend
 // is enabled. It waits until we are leader and switches this Vault to
 // active.
-func (c *Core) waitForLeadership(newLeaderCh chan func(), manualStepDownCh, stopCh chan struct{}) {
+func (c *Core) waitForLeadership(_ chan func(), manualStepDownCh, stopCh chan struct{}) {
 	var manualStepDown bool
 	firstIteration := true
 	for {
