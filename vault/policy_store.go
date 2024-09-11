@@ -6,6 +6,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -197,16 +198,19 @@ func NewPolicyStore(ctx context.Context, core *Core, baseView *BarrierView, syst
 		ps.logger.Error("error collecting acl policy keys", "error", err)
 		return nil, err
 	}
-	ps.logger.Debug("policy_store NewPolicyStore new", "keys", keys)
+
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		ps.logger.Error("unable to get namespace from context", "error", err)
+		return nil, err
+	}
 	for _, key := range keys {
-		index := ps.sanitizeName(key)
-		ps.logger.Trace("policy_store NewPolicyStore 002", "index", index)
+		index := ps.cacheKey(ns, ps.sanitizeName(key)) // root namespace only?
 		ps.policyTypeMap.Store(index, PolicyTypeACL)
 	}
 
 	// Special-case root; doesn't exist on disk but does need to be found
-	ps.policyTypeMap.Store("root", PolicyTypeACL)
-	ps.logger.Trace("policy_store NewPolicyStore 003", "root", PolicyTypeACL)
+	ps.policyTypeMap.Store(ps.cacheKey(ns, "root"), PolicyTypeACL) // root namespace only?
 	return ps, nil
 }
 
@@ -243,15 +247,15 @@ func (c *Core) teardownPolicyStore() error {
 }
 
 func (ps *PolicyStore) invalidate(ctx context.Context, name string, policyType PolicyType) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	ps.logger.Error("unable to invalidate key, no namespace info passed", "key", name)
-	//	return
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		ps.logger.Error("unable to invalidate key, no namespace info passed", "key", name)
+		return
+	}
 
 	// This may come with a prefixed "/" due to joining the file path
 	saneName := strings.TrimPrefix(name, "/")
-	index := saneName
+	index := ps.cacheKey(ns, saneName)
 
 	ps.modifyLock.Lock()
 	defer ps.modifyLock.Unlock()
@@ -327,8 +331,11 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 	}
 
 	// Construct the cache key
-	// index := ps.cacheKey(p.namespace, p.Name)
-	index := p.Name
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	index := ps.cacheKey(ns, p.Name) // root namespace only?
 
 	switch p.Type {
 	case PolicyTypeACL:
@@ -351,10 +358,15 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 // GetNonEGPPolicyType returns a policy's type.
 // It will return an error if the policy doesn't exist in the store or isn't
 // an ACL.
-func (ps *PolicyStore) GetNonEGPPolicyType(name string) (*PolicyType, error) {
+// func (ps *PolicyStore) GetNonEGPPolicyType(nsID string, name string) (*PolicyType, error) {
+func (ps *PolicyStore) GetNonEGPPolicyType(ctx context.Context, name string) (*PolicyType, error) {
 	sanitizedName := ps.sanitizeName(name)
 	// index := path.Join(nsID, sanitizedName)
-	index := sanitizedName
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index := ps.cacheKey(ns, sanitizedName)
 
 	pt, ok := ps.policyTypeMap.Load(index)
 	if !ok {
@@ -372,7 +384,6 @@ func (ps *PolicyStore) GetNonEGPPolicyType(name string) (*PolicyType, error) {
 
 // GetPolicy is used to fetch the named policy
 func (ps *PolicyStore) GetPolicy(ctx context.Context, name string, policyType PolicyType) (*Policy, error) {
-	ps.logger.Error("999999", "name", name)
 	return ps.switchedGetPolicy(ctx, name, policyType, true)
 }
 
@@ -385,7 +396,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	}
 	// Policies are normalized to lower-case
 	name = ps.sanitizeName(name)
-	index := name
+	index := ps.cacheKey(ns, name)
 
 	var cache *lru.TwoQueueCache
 	var view *BarrierView
@@ -560,10 +571,10 @@ func (ps *PolicyStore) deletePolicyForce(ctx context.Context, name string, polic
 func (ps *PolicyStore) switchedDeletePolicy(ctx context.Context, name string, policyType PolicyType, physicalDeletion, force bool) error {
 	defer metrics.MeasureSince([]string{"policy", "delete_policy"}, time.Now())
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 	// If not set, the call comes from invalidation, where we'll already have
 	// grabbed the lock
 	if physicalDeletion {
@@ -573,7 +584,7 @@ func (ps *PolicyStore) switchedDeletePolicy(ctx context.Context, name string, po
 
 	// Policies are normalized to lower-case
 	name = ps.sanitizeName(name)
-	index := name
+	index := ps.cacheKey(ns, name)
 
 	view := ps.getBarrierView()
 	if view == nil {
@@ -625,8 +636,7 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 		//}
 		//policyCtx := namespace.ContextWithNamespace(ctx, policyNS)
 		policyCtx := ctx
-		for k, nsPolicyName := range nsPolicyNames {
-			ps.logger.Trace("888888", "k", k, "name", nsPolicyName)
+		for _, nsPolicyName := range nsPolicyNames {
 			p, err := ps.GetPolicy(policyCtx, nsPolicyName, PolicyTypeToken)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get policy: %w", err)
@@ -655,7 +665,6 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 					groups = append(directGroups, inheritedGroups...)
 				}
 			}
-			ps.logger.Trace("parsing templated policy 80001", "policy", policy.Name, "entity", entity.ID, "groups", groups)
 			// p, err := parseACLPolicyWithTemplating(policy.namespace, policy.Raw, true, entity, groups)
 			p, err := parseACLPolicyWithTemplating(policy.Raw, true, entity, groups)
 			if err != nil {
@@ -718,6 +727,6 @@ func (ps *PolicyStore) sanitizeName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-//func (ps *PolicyStore) cacheKey(ns *namespace.Namespace, name string) string {
-//	return path.Join(ns.ID, name)
-//}
+func (ps *PolicyStore) cacheKey(ns *namespace.Namespace, name string) string {
+	return path.Join(ns.ID, name)
+}

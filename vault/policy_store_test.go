@@ -374,7 +374,7 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 
 			_, ps := mockPolicyWithCore(t, false)
 			ps.policyTypeMap.Store(tc.policyStoreKey, tc.policyStoreValue)
-			got, err := ps.GetNonEGPPolicyType(tc.paramPolicyName)
+			got, err := ps.GetNonEGPPolicyType(namespace.RootContext(nil), tc.paramPolicyName)
 			if tc.isErrorExpected {
 				require.Error(t, err)
 				require.Nil(t, got)

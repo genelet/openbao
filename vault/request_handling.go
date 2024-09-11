@@ -120,10 +120,8 @@ func (c *Core) fetchEntityAndDerivedPolicies(ctx context.Context, entityID strin
 		for nsID, pss := range policiesByNS {
 			policies[nsID] = append(policies[nsID], pss...)
 		}
-		c.logger.Debug("aaaaaaaaaaaa", "entity policy", entity.Policies, "group policies", groupPolicies, "filtered", policiesByNS, "policies", policies)
 	}
 
-	c.logger.Debug("entity and derived policies fetched successfully", "entity_id", entityID, "policies", policies)
 	return entity, policies, err
 }
 
@@ -141,14 +139,11 @@ func (c *Core) filterGroupPoliciesByNS(ctx context.Context, groupPolicies map[st
 	}
 
 	for nsID, nsPolicies := range groupPolicies {
-		c.logger.Debug("filtering 0001", "ns_id", nsID, "policies", nsPolicies, "mode", policyApplicationMode)
 		filteredPolicies, err := c.getApplicableGroupPolicies(ctx, nsPolicies, policyApplicationMode)
 		if err != nil && err != ErrNoApplicablePolicies {
 			return nil, err
 		}
-		c.Logger().Trace("filtered 0002", "ns_id", nsID, "policies", filteredPolicies)
 		filteredPolicies = strutil.RemoveDuplicates(filteredPolicies, false)
-		c.Logger().Trace("filtered 0003", "ns_id", nsID, "policies", filteredPolicies)
 		if len(filteredPolicies) != 0 {
 			policies[nsID] = append(policies[nsID], filteredPolicies...)
 		}
@@ -161,7 +156,7 @@ func (c *Core) filterGroupPoliciesByNS(ctx context.Context, groupPolicies map[st
 // apply to the token based on the group policy application mode,
 // and the relationship between the token namespace and the group namespace.
 // func (c *Core) getApplicableGroupPolicies(ctx context.Context, tokenNS *namespace.Namespace, nsID string, nsPolicies []string, policyApplicationMode string) ([]string, error) {
-func (c *Core) getApplicableGroupPolicies(_ context.Context, nsPolicies []string, policyApplicationMode string) ([]string, error) {
+func (c *Core) getApplicableGroupPolicies(ctx context.Context, nsPolicies []string, policyApplicationMode string) ([]string, error) {
 	// policy used to have namespace, so the old code checks if the 2 namespaces are the same.
 	// here we assume they are the same, at the time this function is called.
 	if policyApplicationMode == groupPolicyApplicationModeWithinNamespaceHierarchy {
@@ -187,7 +182,7 @@ func (c *Core) getApplicableGroupPolicies(_ context.Context, nsPolicies []string
 	//}
 
 	for _, policyName := range nsPolicies {
-		t, err := c.policyStore.GetNonEGPPolicyType(policyName)
+		t, err := c.policyStore.GetNonEGPPolicyType(ctx, policyName)
 		if err != nil && errors.Is(err, ErrPolicyNotExistInTypeMap) {
 			// When we attempt to get a non-EGP policy type, and receive an
 			// explicit error that it doesn't exist (in the type map) we log the
