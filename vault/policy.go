@@ -87,7 +87,7 @@ type Policy struct {
 	Raw       string
 	Type      PolicyType
 	Templated bool
-	//namespace *namespace.Namespace
+	// namespace *namespace.Namespace
 }
 
 // ShallowClone returns a shallow clone of the policy. This should not be used
@@ -99,7 +99,7 @@ func (p *Policy) ShallowClone() *Policy {
 		Raw:       p.Raw,
 		Type:      p.Type,
 		Templated: p.Templated,
-		//namespace: p.namespace,
+		// namespace: p.namespace,
 	}
 }
 
@@ -212,8 +212,8 @@ func addGrantingPoliciesToMap(m map[uint32][]logical.PolicyInfo, policy *Policy,
 
 		m[capability] = append(m[capability], logical.PolicyInfo{
 			Name: policy.Name,
-			//NamespaceId:   policy.namespace.ID,
-			//NamespacePath: policy.namespace.Path,
+			// NamespaceId:   policy.namespace.ID,
+			// NamespacePath: policy.namespace.Path,
 			Type: "acl",
 		})
 	}
@@ -258,7 +258,7 @@ func parseACLPolicyWithTemplating(rules string, performTemplating bool, entity *
 	p := Policy{
 		Raw:  rules,
 		Type: PolicyTypeACL,
-		//namespace: ns,
+		// namespace: ns,
 	}
 	if err := hcl.DecodeObject(&p, list); err != nil {
 		return nil, fmt.Errorf("failed to parse policy: %w", err)
@@ -288,7 +288,7 @@ func parsePaths(result *Policy, list *ast.ObjectList, performTemplating bool, en
 				String: key,
 				Entity: identity.ToSDKEntity(entity),
 				Groups: identity.ToSDKGroups(groups),
-				//NamespaceID: result.namespace.ID,
+				// NamespaceID: result.namespace.ID,
 			})
 			if err != nil {
 				continue
@@ -340,7 +340,7 @@ func parsePaths(result *Policy, list *ast.ObjectList, performTemplating bool, en
 		}
 
 		// Ensure we are using the full request path internally
-		//pc.Path = result.namespace.Path + pc.Path
+		// pc.Path = result.namespace.Path + pc.Path
 
 		if strings.Contains(pc.Path, "+*") {
 			return fmt.Errorf("path %q: invalid use of wildcards ('+*' is forbidden)", pc.Path)

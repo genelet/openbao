@@ -547,7 +547,7 @@ func (i *IdentityStore) handleGroupListCommon(_ context.Context, byID bool) (*lo
 
 	txn := i.db.Txn(false)
 
-	//iter, err := txn.Get(groupsTable, "namespace_id", ns.ID)
+	// iter, err := txn.Get(groupsTable, "namespace_id", ns.ID)
 	iter, err := txn.Get(groupsTable, "namespace_id", namespace.RootNamespaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup groups using namespace ID: %w", err)

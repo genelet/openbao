@@ -1060,7 +1060,7 @@ func (i *IdentityStore) pathOIDCCreateUpdateClient(ctx context.Context, req *log
 
 	client := client{
 		Name: name,
-		//NamespaceID: ns.ID,
+		// NamespaceID: ns.ID,
 	}
 	if req.Operation == logical.UpdateOperation {
 		entry, err := req.Storage.Get(ctx, clientPath+name)
@@ -1501,7 +1501,7 @@ func (i *IdentityStore) getOIDCProvider(ctx context.Context, s logical.Storage, 
 		provider.effectiveIssuer = i.redirectAddr
 	}
 
-	//provider.effectiveIssuer += "/v1/" + ns.Path + "identity/oidc/provider/" + name
+	// provider.effectiveIssuer += "/v1/" + ns.Path + "identity/oidc/provider/" + name
 	provider.effectiveIssuer += "/v1/identity/oidc/provider/" + name
 
 	return &provider, nil
@@ -2077,18 +2077,18 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	accessTokenExpiry := accessTokenIssuedAt.Add(client.AccessTokenTTL)
 	accessToken := &logical.TokenEntry{
 		Type: logical.TokenTypeBatch,
-		//NamespaceID:        ns.ID,
+		// NamespaceID:        ns.ID,
 		Path:         req.Path,
 		TTL:          client.AccessTokenTTL,
 		CreationTime: accessTokenIssuedAt.Unix(),
-		//EntityID:           entity.ID,
+		// EntityID:           entity.ID,
 		NoIdentityPolicies: true,
 		Meta: map[string]string{
 			"oidc_token_type": "access token",
 		},
 		InternalMeta: map[string]string{
 			accessTokenClientIDMeta: client.ClientID,
-			//accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
+			// accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
 		},
 		InlinePolicy: fmt.Sprintf(`
 			path "identity/oidc/provider/%s/userinfo" {
@@ -2311,7 +2311,7 @@ func (i *IdentityStore) pathOIDCUserInfo(ctx context.Context, req *logical.Reque
 	}
 
 	// Populate each of the token's scope templates
-	//templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, ns, entity, scopes...)
+	// templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, ns, entity, scopes...)
 	templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, namespace.RootNamespace, entity, scopes...)
 	if !conflict && err != nil {
 		return userInfoResponse(nil, ErrUserInfoServerError, err.Error())
@@ -2796,7 +2796,7 @@ func (i *IdentityStore) memDBClientByNameInTxn(ctx context.Context, txn *memdb.T
 	//	return nil, err
 	//}
 
-	//clientRaw, err := txn.First(oidcClientsTable, "name", ns.ID, name)
+	// clientRaw, err := txn.First(oidcClientsTable, "name", ns.ID, name)
 	clientRaw, err := txn.First(oidcClientsTable, "name", namespace.RootNamespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch client from memdb using name: %w", err)

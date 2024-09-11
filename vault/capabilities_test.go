@@ -109,7 +109,7 @@ path "secret/sample" {
 		t.Fatalf("bad: resp: %#v\nerr: %#v\n", resp, err)
 	}
 
-	//actual, err = c.Capabilities(namespace.RootContext(nil), "capabilitiestoken", "secret/sample")
+	// actual, err = c.Capabilities(namespace.RootContext(nil), "capabilitiestoken", "secret/sample")
 	actual, err = c.Capabilities(ctx, "capabilitiestoken", "secret/sample")
 	if err != nil {
 		t.Fatalf("err: %v", err)

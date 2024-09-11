@@ -31,8 +31,8 @@ func mockRollback(t *testing.T) (*RollbackManager, *NoopBackend) {
 	mounts.Entries = []*MountEntry{
 		{
 			Path: "foo",
-			//NamespaceID: namespace.RootNamespaceID,
-			//namespace:   namespace.RootNamespace,
+			// NamespaceID: namespace.RootNamespaceID,
+			// namespace:   namespace.RootNamespace,
 		},
 	}
 	meUUID, err := uuid.GenerateUUID()
@@ -40,7 +40,7 @@ func mockRollback(t *testing.T) (*RollbackManager, *NoopBackend) {
 		t.Fatal(err)
 	}
 
-	//if err := router.Mount(backend, "foo", &MountEntry{UUID: meUUID, Accessor: "noopaccessor", NamespaceID: namespace.RootNamespaceID, namespace: namespace.RootNamespace}, view); err != nil {
+	// if err := router.Mount(backend, "foo", &MountEntry{UUID: meUUID, Accessor: "noopaccessor", NamespaceID: namespace.RootNamespaceID, namespace: namespace.RootNamespace}, view); err != nil {
 	if err := router.Mount(backend, "foo", &MountEntry{UUID: meUUID, Accessor: "noopaccessor", Path: "logical/foo"}, view); err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -111,8 +111,8 @@ func TestRollbackManager_ManyWorkers(t *testing.T) {
 			Table:    mountTableType,
 			UUID:     meUUID,
 			Accessor: fmt.Sprintf("accessor-%d", i),
-			//NamespaceID: namespace.RootNamespaceID,
-			//namespace:   namespace.RootNamespace,
+			// NamespaceID: namespace.RootNamespaceID,
+			// namespace:   namespace.RootNamespace,
 			Path: fmt.Sprintf("logical/foo/%d", i),
 		}
 		func() {
@@ -194,8 +194,8 @@ func TestRollbackManager_WorkerPool(t *testing.T) {
 			Table:    mountTableType,
 			UUID:     meUUID,
 			Accessor: fmt.Sprintf("accessor-%d", i),
-			//NamespaceID: namespace.RootNamespaceID,
-			//namespace:   namespace.RootNamespace,
+			// NamespaceID: namespace.RootNamespaceID,
+			// namespace:   namespace.RootNamespace,
 			Path: fmt.Sprintf("logical/foo/%d", i),
 		}
 		func() {

@@ -195,7 +195,7 @@ func TestNewCore_configureLogicalBackends(t *testing.T) {
 
 			core := &Core{}
 			require.Len(t, core.logicalBackends, 0)
-			//core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t), tc.adminNamespacePath)
+			// core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t), tc.adminNamespacePath)
 			core.configureLogicalBackends(tc.backends, corehelpers.NewTestLogger(t))
 			require.GreaterOrEqual(t, len(core.logicalBackends), tc.expectedNonEntBackends)
 			require.Contains(t, core.logicalBackends, mountTypeKV)
@@ -817,7 +817,7 @@ func TestCore_ShutdownDone(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		err := c.Shutdown()
 		if err != nil {
-			//t.Fatal(err)
+			// t.Fatal(err)
 			panic(err)
 		}
 	}()

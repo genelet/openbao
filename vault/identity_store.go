@@ -58,7 +58,7 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		router:       core.router,
 		redirectAddr: core.redirectAddr,
 		localNode:    core,
-		//namespacer:    core,
+		// namespacer:    core,
 		metrics:       core.MetricSink(),
 		totpPersister: core,
 		groupUpdater:  core,
@@ -119,8 +119,8 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		RunningVersion: versions.DefaultBuiltinVersion,
 	}
 
-	//iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
-	//iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
+	// iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
+	// iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
 
 	err = iStore.Setup(ctx, config)
 	if err != nil {
@@ -1172,7 +1172,7 @@ func (i *IdentityStore) CreateEntity(ctx context.Context) (*identity.Entity, err
 		[]string{"identity", "entity", "creation"},
 		1,
 		[]metrics.Label{
-			//nsLabel,
+			// nsLabel,
 		})
 
 	return entity.Clone()
@@ -1280,7 +1280,7 @@ func (i *IdentityStore) CreateOrFetchEntity(ctx context.Context, alias *logical.
 			[]string{"identity", "entity", "creation"},
 			1,
 			[]metrics.Label{
-				//nsLabel,
+				// nsLabel,
 				{Name: "auth_method", Value: newAlias.MountType},
 				{Name: "mount_point", Value: newAlias.MountPath},
 			})

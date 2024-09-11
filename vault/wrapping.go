@@ -138,7 +138,7 @@ DONELISTHANDLING:
 		TTL:            resp.WrapInfo.TTL,
 		NumUses:        1,
 		ExplicitMaxTTL: resp.WrapInfo.TTL,
-		//NamespaceID:    ns.ID,
+		// NamespaceID:    ns.ID,
 	}
 
 	if err := c.CreateToken(ctx, &te); err != nil {
@@ -153,7 +153,7 @@ DONELISTHANDLING:
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			//metricsutil.NamespaceLabel(ns),
+			// metricsutil.NamespaceLabel(ns),
 			// The type of the secret engine is not all that useful;
 			// we could use "token" but let's be more descriptive,
 			// even if it's not a real auth method.

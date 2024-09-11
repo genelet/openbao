@@ -49,7 +49,7 @@ func (c *Core) AddIrrevocableLease(ctx context.Context, pathPrefix string) (*bas
 	le := &leaseEntry{
 		LeaseID: leaseID,
 		Path:    pathPrefix,
-		//namespace:  ns,
+		// namespace:  ns,
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(randomTimeDelta * time.Hour),
 		RevokeErr:  "some error message",

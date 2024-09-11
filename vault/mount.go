@@ -241,7 +241,7 @@ func (t *MountTable) shallowClone() *MountTable {
 func (t *MountTable) setTaint(path string, tainted bool, mountState string) (*MountEntry, error) {
 	n := len(t.Entries)
 	for i := 0; i < n; i++ {
-		//if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == nsID {
+		// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == nsID {
 		if entry := t.Entries[i]; entry.Path == path {
 			t.Entries[i].Tainted = tainted
 			t.Entries[i].MountState = mountState
@@ -261,7 +261,7 @@ func (t *MountTable) remove(_ context.Context, path string) (*MountEntry, error)
 	//}
 
 	for i := 0; i < n; i++ {
-		//if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
+		// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
 		if entry := t.Entries[i]; entry.Path == path {
 			t.Entries[i], t.Entries[n-1] = t.Entries[n-1], nil
 			t.Entries = t.Entries[:n-1]
@@ -279,7 +279,7 @@ func (t *MountTable) find(_ context.Context, path string) (*MountEntry, error) {
 	//}
 
 	for i := 0; i < n; i++ {
-		//if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
+		// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
 		if entry := t.Entries[i]; entry.Path == path {
 			return entry, nil
 		}
@@ -295,7 +295,7 @@ func (t *MountTable) findByBackendUUID(_ context.Context, backendUUID string) (*
 	//}
 
 	for i := 0; i < n; i++ {
-		//if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID && entry.Namespace().ID == ns.ID {
+		// if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID && entry.Namespace().ID == ns.ID {
 		if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID {
 			return entry, nil
 		}
@@ -340,7 +340,7 @@ type MountEntry struct {
 	ExternalEntropyAccess bool              `json:"external_entropy_access,omitempty"` // Whether to allow external entropy source access
 	Tainted               bool              `json:"tainted,omitempty"`                 // Set as a Write-Ahead flag for unmount/remount
 	MountState            string            `json:"mount_state,omitempty"`             // The current mount state.  The only non-empty mount state right now is "unmounting"
-	//NamespaceID           string            `json:"namespace_id"`
+	// NamespaceID           string            `json:"namespace_id"`
 
 	// namespace contains the populated namespace
 	// namespace *namespace.Namespace
@@ -461,7 +461,7 @@ func (e *MountEntry) APIPath() string {
 	if e.Table == credentialTableType {
 		path = credentialRoutePrefix + path
 	}
-	//return e.namespace.Path + path
+	// return e.namespace.Path + path
 	return path
 }
 
@@ -567,7 +567,7 @@ func (c *Core) mount(ctx context.Context, entry *MountEntry) error {
 
 	// Prevent protected paths from being mounted
 	for _, p := range protectedMounts {
-		//if strings.HasPrefix(entry.Path, p) && entry.namespace == nil {
+		// if strings.HasPrefix(entry.Path, p) && entry.namespace == nil {
 		if strings.HasPrefix(entry.Path, p) {
 			return logical.CodedError(403, fmt.Sprintf("cannot mount %q", entry.Path))
 		}
@@ -616,7 +616,7 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	// Basic check for matching names
 	for _, ent := range c.mounts.Entries {
 		// oss start
-		//c.logger.Trace("mountInternal 001", "namespace_id", ns.ID, "namespace_path", ns.Path, "ent_namespace_id", ent.NamespaceID, "ent_namespace_path", ent.namespace.Path, "ent_path", ent.Path, "entry_path", entry.Path)
+		// c.logger.Trace("mountInternal 001", "namespace_id", ns.ID, "namespace_path", ns.Path, "ent_namespace_id", ent.NamespaceID, "ent_namespace_path", ent.namespace.Path, "ent_path", ent.Path, "entry_path", entry.Path)
 		// oss end
 		//	if ns.ID == ent.NamespaceID {
 		switch {
@@ -805,7 +805,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 
 	// Verify exact match of the route
 	match := c.router.MatchingMount(ctx, path)
-	//if match == "" || ns.Path+path != match {
+	// if match == "" || ns.Path+path != match {
 	if match == "" || path != match {
 		return fmt.Errorf("no matching mount")
 	}
@@ -829,7 +829,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 		return err
 	}
 
-	//rCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+	// rCtx := namespace.ContextWithNamespace(c.activeContext, ns)
 	rCtx := c.activeContext
 	if backend != nil && c.rollback != nil {
 		// Invoke the rollback manager a final time. This is not fatal as
@@ -858,7 +858,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 		// Don't attempt to clear data, replication will handle this
 	default:
 		// Have writable storage, remove the whole thing
-		//if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", ns.ID, "path", path)); err != nil {
+		// if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", ns.ID, "path", path)); err != nil {
 		if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", namespace.RootNamespace, "path", path)); err != nil {
 			c.logger.Error("failed to clear view for path being unmounted", "error", err, "path", path)
 			return err
@@ -877,7 +877,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 	}
 
 	if c.quotaManager != nil {
-		//if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
+		// if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
 		if err := c.quotaManager.HandleBackendDisabling(ctx, path); err != nil {
 			c.logger.Error("failed to update quotas after disabling mount", "path", path, "error", err)
 			return err
@@ -1030,17 +1030,16 @@ func (c *Core) remountForceInternal(ctx context.Context, path string, updateStor
 }
 
 func (c *Core) remountSecretsEngineCurrentNamespace(ctx context.Context, src, dst string, updateStorage bool) error {
-	//return nil
+	// return nil
 
 	//ns, err := namespace.FromContext(ctx)
 	//if err != nil {
 	//	return err
 	//}
 
-	//srcPathDetails := c.splitNamespaceAndMountFromPath(ns.Path, src)
-	//dstPathDetails := c.splitNamespaceAndMountFromPath(ns.Path, dst)
+	// srcPathDetails := c.splitNamespaceAndMountFromPath(ns.Path, src)
+	// dstPathDetails := c.splitNamespaceAndMountFromPath(ns.Path, dst)
 	return c.remountSecretsEngine(ctx, src, dst, updateStorage)
-
 }
 
 // remountSecretsEngine is used to remount a path at a new mount point.
@@ -1090,7 +1089,7 @@ func (c *Core) remountSecretsEngine(ctx context.Context, src, dst string, update
 	// various periodic funcs (e.g., PKI) can legitimately error; the
 	// periodic rollback manager logs these errors rather than failing
 	// replication like returning this error would do.
-	//rCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+	// rCtx := namespace.ContextWithNamespace(c.activeContext, ns)
 	rCtx := c.activeContext
 	if c.rollback != nil && c.router.MatchingBackend(ctx, src) != nil {
 		if err := c.rollback.Rollback(rCtx, src); err != nil {
@@ -1099,7 +1098,7 @@ func (c *Core) remountSecretsEngine(ctx context.Context, src, dst string, update
 		}
 	}
 
-	//revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
+	// revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
 	revokeCtx := ctx
 	// Revoke all the dynamic keys
 	if err := c.expiration.RevokePrefix(revokeCtx, src, true); err != nil {
@@ -1113,8 +1112,8 @@ func (c *Core) remountSecretsEngine(ctx context.Context, src, dst string, update
 	}
 
 	srcMatch.Tainted = false
-	//srcMatch.NamespaceID = dst.Namespace.ID
-	//srcMatch.namespace = dst.Namespace
+	// srcMatch.NamespaceID = dst.Namespace.ID
+	// srcMatch.namespace = dst.Namespace
 	srcPath := srcMatch.Path
 	srcMatch.Path = dst
 
@@ -1151,7 +1150,7 @@ func (c *Core) splitNamespaceAndMountFromPath(currNs, path string) namespace.Mou
 	mountPath := strings.TrimPrefix(fullPath, namespace.RootNamespace.Path)
 
 	return namespace.MountPathDetails{
-		//Namespace: namespace.RootNamespace,
+		// Namespace: namespace.RootNamespace,
 		MountPath: sanitizePath(mountPath),
 	}
 }
@@ -1296,7 +1295,7 @@ func (c *Core) runMountUpdates(ctx context.Context, needPersist bool) error {
 			needPersist = true
 		}
 
-		//if entry.NamespaceID == "" {
+		// if entry.NamespaceID == "" {
 		//	entry.NamespaceID = namespace.RootNamespaceID
 		// OSS Oneline, do we need it?
 		needPersist = true
@@ -1522,14 +1521,14 @@ func (c *Core) setupMounts(ctx context.Context) error {
 		if entry.Tainted {
 			// Calculate any namespace prefixes here, because when Taint() is called, there won't be
 			// a namespace to pull from the context. This is similar to what we do above in c.router.Mount().
-			//path := entry.Namespace().Path + entry.Path
+			// path := entry.Namespace().Path + entry.Path
 			path := entry.Path
 			c.logger.Debug("tainting a mount due to it being marked as tainted in mount table", "entry.path", entry.Path, "full_path", path)
 			c.router.Taint(ctx, path)
 		}
 
 		// Ensure the cache is populated, don't need the result
-		//NamespaceByID(ctx, entry.NamespaceID, c)
+		// NamespaceByID(ctx, entry.NamespaceID, c)
 	}
 	return nil
 }
@@ -1543,7 +1542,7 @@ func (c *Core) unloadMounts(ctx context.Context) error {
 	if c.mounts != nil {
 		mountTable := c.mounts.shallowClone()
 		for _, e := range mountTable.Entries {
-			//backend := c.router.MatchingBackend(namespace.ContextWithNamespace(ctx, e.namespace), e.Path)
+			// backend := c.router.MatchingBackend(namespace.ContextWithNamespace(ctx, e.namespace), e.Path)
 			backend := c.router.MatchingBackend(ctx, e.Path)
 			if backend != nil {
 				backend.Cleanup(ctx)
@@ -1615,7 +1614,7 @@ func (c *Core) newLogicalBackend(ctx context.Context, entry *MountEntry, sysView
 		BackendUUID: entry.BackendAwareUUID,
 	}
 
-	//ctx = namespace.ContextWithNamespace(ctx, entry.namespace)
+	// ctx = namespace.ContextWithNamespace(ctx, entry.namespace)
 	ctx = context.WithValue(ctx, "core_number", c.coreNumber)
 	b, err := f(ctx, config)
 	if err != nil {
@@ -1770,7 +1769,7 @@ func (c *Core) singletonMountTables() (mounts, auth *MountTable) {
 
 	c.mountsLock.RLock()
 	for _, entry := range c.mounts.Entries {
-		//if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local && entry.Namespace().ID == namespace.RootNamespaceID {
+		// if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local && entry.Namespace().ID == namespace.RootNamespaceID {
 		if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local {
 			mounts.Entries = append(mounts.Entries, entry)
 		}
@@ -1779,7 +1778,7 @@ func (c *Core) singletonMountTables() (mounts, auth *MountTable) {
 
 	c.authLock.RLock()
 	for _, entry := range c.auth.Entries {
-		//if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local && entry.Namespace().ID == namespace.RootNamespaceID {
+		// if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local && entry.Namespace().ID == namespace.RootNamespaceID {
 		if strutil.StrListContains(singletonMounts, entry.Type) && !entry.Local {
 			auth.Entries = append(auth.Entries, entry)
 		}
@@ -1810,8 +1809,8 @@ func (c *Core) createMigrationStatus(from, to string) (string, error) {
 		return "", fmt.Errorf("error generating uuid for mount move invocation: %w", err)
 	}
 	migrationInfo := MountMigrationInfo{
-		//SourceMount:     from.Namespace.Path + from.MountPath,
-		//TargetMount:     to.Namespace.Path + to.MountPath,
+		// SourceMount:     from.Namespace.Path + from.MountPath,
+		// TargetMount:     to.Namespace.Path + to.MountPath,
 		SourceMount:     from,
 		TargetMount:     to,
 		MigrationStatus: MigrationInProgressStatus.String(),

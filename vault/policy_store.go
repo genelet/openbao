@@ -309,7 +309,7 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 	defer ps.modifyLock.Unlock()
 
 	// Get the appropriate view based on policy type and namespace
-	//view := ps.getBarrierView(p.namespace, p.Type)
+	// view := ps.getBarrierView(p.namespace, p.Type)
 	view := ps.getBarrierView()
 	if view == nil {
 		return fmt.Errorf("unable to get the barrier subview for policy type %q", p.Type)
@@ -327,7 +327,7 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 	}
 
 	// Construct the cache key
-	//index := ps.cacheKey(p.namespace, p.Name)
+	// index := ps.cacheKey(p.namespace, p.Name)
 	index := p.Name
 
 	switch p.Type {
@@ -353,7 +353,7 @@ func (ps *PolicyStore) setPolicyInternal(ctx context.Context, p *Policy) error {
 // an ACL.
 func (ps *PolicyStore) GetNonEGPPolicyType(name string) (*PolicyType, error) {
 	sanitizedName := ps.sanitizeName(name)
-	//index := path.Join(nsID, sanitizedName)
+	// index := path.Join(nsID, sanitizedName)
 	index := sanitizedName
 
 	pt, ok := ps.policyTypeMap.Load(index)
@@ -421,7 +421,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	if policyType == PolicyTypeACL && name == "root" && ns.ID == namespace.RootNamespaceID {
 		p := &Policy{
 			Name: "root",
-			//namespace: namespace.RootNamespace,
+			// namespace: namespace.RootNamespace,
 		}
 		if cache != nil {
 			cache.Add(index, p)
@@ -468,7 +468,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	policy.Raw = policyEntry.Raw
 	policy.Type = policyEntry.Type
 	policy.Templated = policyEntry.Templated
-	//policy.namespace = ns
+	// policy.namespace = ns
 	switch policyEntry.Type {
 	case PolicyTypeACL:
 		// Parse normally
@@ -656,7 +656,7 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 				}
 			}
 			ps.logger.Trace("parsing templated policy 80001", "policy", policy.Name, "entity", entity.ID, "groups", groups)
-			//p, err := parseACLPolicyWithTemplating(policy.namespace, policy.Raw, true, entity, groups)
+			// p, err := parseACLPolicyWithTemplating(policy.namespace, policy.Raw, true, entity, groups)
 			p, err := parseACLPolicyWithTemplating(policy.Raw, true, entity, groups)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing templated policy %q: %w", policy.Name, err)

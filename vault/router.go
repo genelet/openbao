@@ -173,7 +173,7 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	defer r.l.Unlock()
 
 	// prepend namespace
-	//prefix = mountEntry.Namespace().Path + prefix
+	// prefix = mountEntry.Namespace().Path + prefix
 
 	// Check if this is a nested mount
 	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
@@ -517,7 +517,7 @@ func (r *Router) MatchingStoragePrefixByAPIPath(ctx context.Context, path string
 func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string) (string, string, bool) {
 	me, prefix, found := r.matchingMountEntryByPath(ctx, path, false)
 	if !found {
-		//return nil, "", "", false
+		// return nil, "", "", false
 		return "", "", found
 	}
 
@@ -527,7 +527,7 @@ func (r *Router) MatchingAPIPrefixByStoragePath(ctx context.Context, path string
 		mountPath = credentialRoutePrefix + mountPath
 	}
 
-	//return me.Namespace(), mountPath, prefix, found
+	// return me.Namespace(), mountPath, prefix, found
 	return mountPath, prefix, found
 }
 
@@ -860,7 +860,7 @@ func (r *Router) RootPath(ctx context.Context, path string) bool {
 	//	return false
 	//}
 
-	//adjustedPath := ns.Path + path
+	// adjustedPath := ns.Path + path
 	adjustedPath := path
 
 	r.l.RLock()
@@ -902,7 +902,7 @@ func (r *Router) LoginPath(ctx context.Context, path string) bool {
 	//	return false
 	//}
 
-	//adjustedPath := ns.Path + path
+	// adjustedPath := ns.Path + path
 	adjustedPath := path
 
 	r.l.RLock()

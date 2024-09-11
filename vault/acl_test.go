@@ -26,7 +26,6 @@ func testNewACL(t *testing.T) {
 	ctx := context.Background()
 	policy := []*Policy{{Name: "root"}}
 	_, err := NewACL(ctx, policy)
-
 	if err != nil {
 		t.Fatal("error %w", err)
 	}
@@ -866,14 +865,14 @@ func TestACLGrantingPolicies(t *testing.T) {
 
 	policyInfo := logical.PolicyInfo{
 		Name: "granting_policy",
-		//NamespaceId:   "root",
-		//NamespacePath: "",
+		// NamespaceId:   "root",
+		// NamespacePath: "",
 		Type: "acl",
 	}
 	mergedInfo := logical.PolicyInfo{
 		Name: "granting_policy_merged",
-		//NamespaceId:   "root",
-		//NamespacePath: "",
+		// NamespaceId:   "root",
+		// NamespacePath: "",
 		Type: "acl",
 	}
 

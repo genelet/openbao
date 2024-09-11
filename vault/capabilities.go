@@ -47,7 +47,7 @@ func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, 
 
 	var policyCount int
 	policyNames := make(map[string][]string)
-	//policyNames[tokenNS.ID] = te.Policies
+	// policyNames[tokenNS.ID] = te.Policies
 	policyNames[ns.ID] = te.Policies
 	policyCount += len(te.Policies)
 
@@ -87,7 +87,7 @@ func (c *Core) Capabilities(ctx context.Context, token, path string) ([]string, 
 
 	// Construct the corresponding ACL object. ACL construction should be
 	// performed on the token's namespace.
-	//tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	// tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
 	tokenCtx := ctx
 	c.Logger().Trace("7777777777", "policyNames", policyNames, "policies", policies)
 	acl, err := c.policyStore.ACL(tokenCtx, entity, policyNames, policies...)

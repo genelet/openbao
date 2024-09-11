@@ -173,7 +173,7 @@ func (i *IdentityStore) handleGroupAliasUpdateCommon(ctx context.Context, _ *log
 	if groupAlias == nil {
 		groupAlias = &identity.Alias{
 			CreationTime: ptypes.TimestampNow(),
-			//NamespaceID:  ns.ID,
+			// NamespaceID:  ns.ID,
 		}
 		groupAlias.LastUpdateTime = groupAlias.CreationTime
 	} else {

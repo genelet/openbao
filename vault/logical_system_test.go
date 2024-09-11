@@ -3134,7 +3134,7 @@ func TestSystemBackend_rawDelete(t *testing.T) {
 	p := &Policy{
 		Name: "test",
 		Type: PolicyTypeACL,
-		//namespace: namespace.RootNamespace,
+		// namespace: namespace.RootNamespace,
 	}
 	err := c.policyStore.SetPolicy(namespace.RootContext(nil), p)
 	if err != nil {

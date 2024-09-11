@@ -45,7 +45,7 @@ type extendedSystemViewImpl struct {
 func (e extendedSystemViewImpl) Auditor() logical.Auditor {
 	return genericAuditor{
 		mountType: e.mountEntry.Type,
-		//namespace: e.mountEntry.Namespace(),
+		// namespace: e.mountEntry.Namespace(),
 		c: e.core,
 	}
 }
@@ -94,7 +94,7 @@ func (e extendedSystemViewImpl) SudoPrivilege(ctx context.Context, path string, 
 		policyNames[nsID] = append(policyNames[nsID], nsPolicies...)
 	}
 
-	//tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	// tokenCtx := namespace.ContextWithNamespace(ctx, tokenNS)
 	tokenCtx := ctx
 
 	// Add the inline policy if it's set
@@ -398,7 +398,7 @@ func (d dynamicSystemView) GeneratePasswordFromPolicy(ctx context.Context, polic
 		defer cancel()
 	}
 
-	//ctx = namespace.ContextWithNamespace(ctx, d.mountEntry.Namespace())
+	// ctx = namespace.ContextWithNamespace(ctx, d.mountEntry.Namespace())
 
 	policyCfg, err := d.retrievePasswordPolicy(ctx, policyName)
 	if err != nil {

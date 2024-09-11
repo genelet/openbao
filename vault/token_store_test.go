@@ -585,7 +585,7 @@ func testMakeTokenViaRequestContext(t testing.TB, ctx context.Context, ts *Token
 
 	te := &logical.TokenEntry{
 		Path: resp.Auth.CreationPath,
-		//NamespaceID: ns.ID,
+		// NamespaceID: ns.ID,
 	}
 
 	if resp.Auth.TokenType != logical.TokenTypeBatch {
@@ -1152,7 +1152,7 @@ func TestTokenStore_CreateLookup_ExpirationInRestoreMode(t *testing.T) {
 		Path:        ent.Path,
 		IssueTime:   time.Now(),
 		ExpireTime:  time.Now().Add(1 * time.Hour),
-		//namespace:   namespace.RootNamespace,
+		// namespace:   namespace.RootNamespace,
 	}
 	if err := ts.expiration.persistEntry(namespace.RootContext(nil), le); err != nil {
 		t.Fatalf("err: %v", err)
@@ -1311,7 +1311,7 @@ func TestTokenStore_Revoke_Leases(t *testing.T) {
 
 	// Mount a noop backend
 	noop := &NoopBackend{}
-	//err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor", namespace: namespace.RootNamespace}, view)
+	// err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor", namespace: namespace.RootNamespace}, view)
 	err := ts.expiration.router.Mount(noop, "noop/", &MountEntry{UUID: "noopuuid", Accessor: "noopaccessor"}, view)
 	if err != nil {
 		t.Fatal(err)
@@ -5771,7 +5771,7 @@ func TestTokenStore_TidyLeaseRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor", namespace: namespace.RootNamespace}, view)
+	// err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor", namespace: namespace.RootNamespace}, view)
 	err = exp.router.Mount(noop, "prod/aws/", &MountEntry{UUID: meUUID, Accessor: "awsaccessor"}, view)
 	if err != nil {
 		t.Fatal(err)

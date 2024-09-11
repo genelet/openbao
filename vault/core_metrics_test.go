@@ -211,7 +211,7 @@ func TestCoreMetrics_KvSecretGaugeError(t *testing.T) {
 	ctx := namespace.RootContext(nil)
 
 	badKvMount := &kvMount{
-		//Namespace:  namespace.RootNamespace,
+		// Namespace:  namespace.RootNamespace,
 		MountPoint: "bad/path",
 		Version:    "1",
 		NumSecrets: 0,

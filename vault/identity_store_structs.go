@@ -97,7 +97,7 @@ type IdentityStore struct {
 	router       *Router
 	redirectAddr string
 	localNode    LocalNode
-	//namespacer    Namespacer
+	// namespacer    Namespacer
 	metrics       metricsutil.Metrics
 	totpPersister TOTPPersister
 	groupUpdater  GroupUpdater
@@ -128,8 +128,7 @@ var _ LocalNode = &Core{}
 //	ListNamespaces(includePath bool) []*namespace.Namespace
 //}
 
-//var _ Namespacer = &Core{}
-
+// var _ Namespacer = &Core{}
 type TOTPPersister interface {
 	PersistTOTPKey(ctx context.Context, configID string, entityID string, key string) error
 }

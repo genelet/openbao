@@ -288,7 +288,7 @@ func (c *Core) findKvMounts() []*kvMount {
 				version = "1"
 			}
 			mounts = append(mounts, &kvMount{
-				//Namespace:  entry.namespace,
+				// Namespace:  entry.namespace,
 				MountPoint: entry.Path,
 				Version:    version,
 				NumSecrets: 0,
@@ -309,10 +309,10 @@ func (c *Core) kvCollectionErrorCount() {
 func (c *Core) walkKvMountSecrets(ctx context.Context, m *kvMount) {
 	var subdirectories []string
 	if m.Version == "1" {
-		//subdirectories = []string{m.Namespace.Path + m.MountPoint}
+		// subdirectories = []string{m.Namespace.Path + m.MountPoint}
 		subdirectories = []string{m.MountPoint}
 	} else {
-		//subdirectories = []string{m.Namespace.Path + m.MountPoint + "metadata/"}
+		// subdirectories = []string{m.Namespace.Path + m.MountPoint + "metadata/"}
 		subdirectories = []string{m.MountPoint + "metadata/"}
 	}
 
@@ -390,7 +390,7 @@ func (c *Core) kvSecretGaugeCollector(ctx context.Context) ([]metricsutil.GaugeL
 		}
 
 		results[i].Labels = []metrics.Label{
-			//metricsutil.NamespaceLabel(m.Namespace),
+			// metricsutil.NamespaceLabel(m.Namespace),
 			{Name: "mount_point", Value: m.MountPoint},
 		}
 
@@ -460,7 +460,7 @@ func (c *Core) entityGaugeCollectorByMount(ctx context.Context) ([]metricsutil.G
 		}
 		values = append(values, metricsutil.GaugeLabelValues{
 			Labels: []metrics.Label{
-				//metricsutil.NamespaceLabel(mountEntry.namespace),
+				// metricsutil.NamespaceLabel(mountEntry.namespace),
 				{Name: "auth_method", Value: mountEntry.Type},
 				{Name: "mount_point", Value: "auth/" + mountEntry.Path},
 			},

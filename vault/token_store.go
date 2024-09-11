@@ -842,7 +842,7 @@ func (ts *TokenStore) Salt(ctx context.Context) (*salt.Salt, error) {
 	if err != nil {
 		return nil, err
 	}
-	//ts.salts[ns.ID] = salt
+	// ts.salts[ns.ID] = salt
 	return salt, nil
 }
 
@@ -894,7 +894,7 @@ type tsRoleEntry struct {
 type accessorEntry struct {
 	TokenID    string `json:"token_id"`
 	AccessorID string `json:"accessor_id"`
-	//NamespaceID string `json:"namespace_id"`
+	// NamespaceID string `json:"namespace_id"`
 }
 
 // SetExpirationManager is used to provide the token store with
@@ -1011,7 +1011,7 @@ func (ts *TokenStore) createAccessor(ctx context.Context, entry *logical.TokenEn
 	//}
 
 	// Create index entry, mapping the accessor to the token ID
-	//saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	// saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
 	saltCtx := ctx
 	saltID, err := ts.SaltID(saltCtx, entry.Accessor)
 	if err != nil {
@@ -1021,7 +1021,7 @@ func (ts *TokenStore) createAccessor(ctx context.Context, entry *logical.TokenEn
 	aEntry := &accessorEntry{
 		TokenID:    entry.ID,
 		AccessorID: entry.Accessor,
-		//NamespaceID: entry.NamespaceID,
+		// NamespaceID: entry.NamespaceID,
 	}
 
 	aEntryBytes, err := jsonutil.EncodeJSON(aEntry)
@@ -1157,7 +1157,7 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 			TTL:          int64(entry.TTL),
 			Role:         entry.Role,
 			EntityID:     entry.EntityID,
-			//NamespaceID:        entry.NamespaceID,
+			// NamespaceID:        entry.NamespaceID,
 			Type:               uint32(entry.Type),
 			InternalMeta:       entry.InternalMeta,
 			InlinePolicy:       entry.InlinePolicy,
@@ -1304,7 +1304,7 @@ func (ts *TokenStore) storeCommon(ctx context.Context, entry *logical.TokenEntry
 	//	return namespace.ErrNoNamespace
 	//}
 
-	//saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
+	// saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
 	saltCtx := ctx
 	saltedID, err := ts.SaltID(saltCtx, entry.ID)
 	if err != nil {
@@ -1703,7 +1703,7 @@ func (ts *TokenStore) lookupInternal(ctx context.Context, id string, salted, tai
 		//	return nil, namespace.ErrNoNamespace
 		//}
 
-		//revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
+		// revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
 		revokeCtx := ctx
 		leaseID, err := ts.expiration.CreateOrFetchRevocationLeaseByToken(revokeCtx, entry)
 		if err != nil {
@@ -1821,7 +1821,7 @@ func (ts *TokenStore) revokeInternal(ctx context.Context, saltedID string, skipO
 		return err
 	}
 
-	//revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
+	// revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
 	revokeCtx := ctx
 	if err := ts.expiration.RevokeByToken(revokeCtx, entry); err != nil {
 		return err
@@ -1892,7 +1892,7 @@ func (ts *TokenStore) revokeInternal(ctx context.Context, saltedID string, skipO
 			return fmt.Errorf("failed to scan for children: %w", err)
 		}
 		for _, child := range children {
-			//var childNSID string
+			// var childNSID string
 			childCtx := revokeCtx
 			/*
 				child, childNSID = namespace.SplitIDFromString(child)
@@ -1960,7 +1960,7 @@ func (ts *TokenStore) revokeTree(ctx context.Context, le *leaseEntry) error {
 	// context for the next call from the lease entry's NS. This function is
 	// only called when a lease for a given token is expiring, so it should run
 	// in the context of the token namespace
-	//revCtx := namespace.ContextWithNamespace(ctx, le.namespace)
+	// revCtx := namespace.ContextWithNamespace(ctx, le.namespace)
 	revCtx := ctx
 
 	saltedID, err := ts.SaltID(revCtx, le.ClientToken)
@@ -2142,7 +2142,7 @@ func (ts *TokenStore) lookupByAccessor(ctx context.Context, id string, salted, t
 		if te != nil {
 			aEntry.TokenID = te.ID
 			aEntry.AccessorID = te.Accessor
-			//aEntry.NamespaceID = te.NamespaceID
+			// aEntry.NamespaceID = te.NamespaceID
 		}
 	}
 
@@ -2178,7 +2178,7 @@ func (ts *TokenStore) handleTidy(ctx context.Context, req *logical.Request, data
 			ts.logger.Info("beginning tidy operation on tokens")
 			defer ts.logger.Info("finished tidy operation on tokens")
 
-			//quitCtx := namespace.ContextWithNamespace(ts.quitContext, ns)
+			// quitCtx := namespace.ContextWithNamespace(ts.quitContext, ns)
 			quitCtx := ts.quitContext
 
 			// List out all the accessors
@@ -2348,7 +2348,7 @@ func (ts *TokenStore) handleTidy(ctx context.Context, req *logical.Request, data
 					// entry only has ID set.
 					tokenEntry := &logical.TokenEntry{
 						ID: accessorEntry.TokenID,
-						//NamespaceID: accessorEntry.NamespaceID,
+						// NamespaceID: accessorEntry.NamespaceID,
 					}
 
 					// Attempt to revoke the token. This will also revoke
@@ -2565,7 +2565,7 @@ func (ts *TokenStore) handleUpdateRevokeAccessor(ctx context.Context, req *logic
 	//	return nil, namespace.ErrNoNamespace
 	//}
 
-	//revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
+	// revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
 	revokeCtx := ctx
 	leaseID, err := ts.expiration.CreateOrFetchRevocationLeaseByToken(revokeCtx, te)
 	if err != nil {
@@ -2785,7 +2785,7 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 		DisplayName:  "token",
 		NumUses:      numUses,
 		CreationTime: time.Now().Unix(),
-		//NamespaceID:  ns.ID,
+		// NamespaceID:  ns.ID,
 		Type: tokenType,
 	}
 
@@ -2922,7 +2922,7 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 
 	// We are creating a token from a parent namespace. We should only use the input
 	// policies.
-	//case ns.ID != parent.NamespaceID:
+	// case ns.ID != parent.NamespaceID:
 	//	addDefault = !noDefaultPolicy
 
 	// No policies specified, inherit parent
@@ -3157,13 +3157,13 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 
 	// Count the successful token creation.
 	ttl_label := metricsutil.TTLBucket(te.TTL)
-	//mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
+	// mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
 	mountPointWithoutNs := req.MountPoint
 	ts.core.metricSink.IncrCounterWithLabels(
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			//metricsutil.NamespaceLabel(ns),
+			// metricsutil.NamespaceLabel(ns),
 			{Name: "auth_method", Value: "token"},
 			{Name: "mount_point", Value: mountPointWithoutNs}, // path, not accessor
 			{Name: "creation_ttl", Value: ttl_label},
@@ -3248,7 +3248,7 @@ func (ts *TokenStore) revokeCommon(ctx context.Context, _ *logical.Request, _ *f
 	//	return nil, namespace.ErrNoNamespace
 	//}
 
-	//revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
+	// revokeCtx := namespace.ContextWithNamespace(ts.quitContext, tokenNS)
 	revokeCtx := ctx
 	leaseID, err := ts.expiration.CreateOrFetchRevocationLeaseByToken(revokeCtx, te)
 	if err != nil {
@@ -3752,7 +3752,7 @@ func (ts *TokenStore) tokenStoreRoleCreateUpdate(ctx context.Context, req *logic
 	} else {
 		_, ok = data.GetOk("period")
 		if ok {
-			//if resp == nil {
+			// if resp == nil {
 			resp = &logical.Response{}
 			//}
 			resp.AddWarning("Both 'token_period' and deprecated 'period' value supplied, ignoring the deprecated value")
@@ -4056,7 +4056,7 @@ func (ts *TokenStore) gaugeCollectorByMethod(ctx context.Context) ([]metricsutil
 		return []metricsutil.GaugeLabelValues{}, errors.New("expiration manager is nil")
 	}
 
-	//rootContext := namespace.RootContext(ctx)
+	// rootContext := namespace.RootContext(ctx)
 	allNamespaces := ts.core.collectNamespaces()
 	byNsAndMethod := make(map[string]map[string]int)
 	/*

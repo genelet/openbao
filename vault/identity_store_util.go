@@ -428,7 +428,7 @@ func (i *IdentityStore) upsertEntityInTxn(ctx context.Context, txn *memdb.Txn, e
 		}
 
 		if alias.NamespaceID == "" {
-			//alias.NamespaceID = namespace.RootNamespaceID
+			// alias.NamespaceID = namespace.RootNamespaceID
 			alias.NamespaceID = ns.ID // should be root?
 		}
 

@@ -89,7 +89,7 @@ func TestExpiration_Metrics(t *testing.T) {
 		le := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i),
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -102,7 +102,7 @@ func TestExpiration_Metrics(t *testing.T) {
 		otherNSle := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			//namespace:  otherNS,
+			// namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -126,7 +126,7 @@ func TestExpiration_Metrics(t *testing.T) {
 		le := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i+1),
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(2 * time.Hour),
 		}
@@ -249,7 +249,7 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 		le := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i),
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -257,7 +257,7 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 		otherNSle := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
-			//namespace:  otherNS,
+			// namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -286,7 +286,7 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 		le := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i+1),
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -295,7 +295,7 @@ func TestExpiration_TotalLeaseCount(t *testing.T) {
 		otherNSle := &leaseEntry{
 			LeaseID: "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
 			Path:    "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
-			//namespace:  otherNS,
+			// namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -343,7 +343,7 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 			LeaseID:   "lease" + fmt.Sprintf("%d", i),
 			Path:      "foo/bar/" + fmt.Sprintf("%d", i),
 			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -352,7 +352,7 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 			LeaseID:   "lease" + fmt.Sprintf("%d", i) + "/blah.nsid",
 			Path:      "foo/bar/" + fmt.Sprintf("%d", i) + "/blah.nsid",
 			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
-			//namespace:  otherNS,
+			// namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now().Add(time.Hour),
 		}
@@ -382,7 +382,7 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 			LeaseID:   "lease" + fmt.Sprintf("%d", i+1),
 			Path:      "foo/bar/" + fmt.Sprintf("%d", i+1),
 			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
-			//namespace:  namespace.RootNamespace,
+			// namespace:  namespace.RootNamespace,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -392,7 +392,7 @@ func TestExpiration_TotalLeaseCount_WithRoles(t *testing.T) {
 			LeaseID:   "lease" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
 			Path:      "foo/bar/" + fmt.Sprintf("%d", i+1) + "/blah.nsid",
 			LoginRole: "loginRole" + fmt.Sprintf("%d", i),
-			//namespace:  otherNS,
+			// namespace:  otherNS,
 			IssueTime:  time.Now(),
 			ExpireTime: time.Now(),
 			RevokeErr:  "some err message",
@@ -464,7 +464,7 @@ func TestExpiration_Tidy(t *testing.T) {
 	le := &leaseEntry{
 		LeaseID: "lease/with/no/client/token",
 		Path:    "foo/bar",
-		//namespace: namespace.RootNamespace,
+		// namespace: namespace.RootNamespace,
 	}
 
 	// Persist the invalid lease entry
@@ -2196,7 +2196,7 @@ func TestExpiration_revokeEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now(),
-		//namespace:  namespace.RootNamespace,
+		// namespace:  namespace.RootNamespace,
 	}
 
 	err = exp.revokeEntry(namespace.RootContext(nil), le)
@@ -2248,7 +2248,7 @@ func TestExpiration_revokeEntry_token(t *testing.T) {
 		Path:        "foo/bar",
 		IssueTime:   time.Now(),
 		ExpireTime:  time.Now().Add(time.Minute),
-		//namespace:   namespace.RootNamespace,
+		// namespace:   namespace.RootNamespace,
 	}
 
 	if err := exp.persistEntry(namespace.RootContext(nil), le); err != nil {
@@ -2338,7 +2338,7 @@ func TestExpiration_renewEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now(),
-		//namespace:  namespace.RootNamespace,
+		// namespace:  namespace.RootNamespace,
 	}
 
 	resp, err := exp.renewEntry(namespace.RootContext(nil), le, 0)
@@ -2404,7 +2404,7 @@ func TestExpiration_revokeEntry_rejected_fairsharing(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(time.Minute),
-		//namespace:  namespace.RootNamespace,
+		// namespace:  namespace.RootNamespace,
 	}
 
 	err = exp.persistEntry(namespace.RootContext(nil), le)
@@ -2492,7 +2492,7 @@ func TestExpiration_renewAuthEntry(t *testing.T) {
 		},
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(time.Minute),
-		//namespace:  namespace.RootNamespace,
+		// namespace:  namespace.RootNamespace,
 	}
 
 	resp, err := exp.renewAuthEntry(namespace.RootContext(nil), &logical.Request{}, le, 0)
@@ -2536,7 +2536,7 @@ func TestExpiration_PersistLoadDelete(t *testing.T) {
 		IssueTime:       lastTime,
 		ExpireTime:      lastTime,
 		LastRenewalTime: lastTime,
-		//namespace:       namespace.RootNamespace,
+		// namespace:       namespace.RootNamespace,
 	}
 	if err := exp.persistEntry(namespace.RootContext(nil), le); err != nil {
 		t.Fatalf("err: %v", err)

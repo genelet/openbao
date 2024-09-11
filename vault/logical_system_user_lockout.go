@@ -32,7 +32,7 @@ func unlockUser(ctx context.Context, core *Core, mountAccessor string, aliasName
 	//	return err
 	//}
 
-	//lockedUserStoragePath := coreLockedUsersPath + ns.ID + "/" + mountAccessor + "/" + aliasName
+	// lockedUserStoragePath := coreLockedUsersPath + ns.ID + "/" + mountAccessor + "/" + aliasName
 	lockedUserStoragePath := coreLockedUsersPath + "/" + mountAccessor + "/" + aliasName
 
 	// remove entry for locked user from storage
@@ -87,7 +87,7 @@ func (b *SystemBackend) getLockedUsersResponses(ctx context.Context, mountAccess
 	if mountAccessor != "" {
 		// get the locked user response for mount_accessor, here for mount_accessor in request
 		totalCountForNSID, mountAccessorsResponse, err := b.getMountAccessorsLockedUsers(ctx, []string{mountAccessor + "/"},
-			//coreLockedUsersPath+queryNS.ID+"/")
+			// coreLockedUsersPath+queryNS.ID+"/")
 			coreLockedUsersPath+"/")
 		if err != nil {
 			return 0, nil, err
@@ -95,8 +95,8 @@ func (b *SystemBackend) getLockedUsersResponses(ctx context.Context, mountAccess
 
 		totalCounts += totalCountForNSID
 		lockedUsersResponse = append(lockedUsersResponse, &LockedUsersResponse{
-			//NamespaceID:    queryNS.ID,
-			//NamespacePath:  queryNS.Path,
+			// NamespaceID:    queryNS.ID,
+			// NamespacePath:  queryNS.Path,
 			Counts:         totalCountForNSID,
 			MountAccessors: mountAccessorsResponse,
 		})

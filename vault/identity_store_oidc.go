@@ -74,7 +74,7 @@ type role struct {
 // required OIDC fields.
 type idToken struct {
 	Issuer string `json:"iss"` // api_addr or custom Issuer
-	//Namespace       string `json:"namespace"` // Namespace of issuer
+	// Namespace       string `json:"namespace"` // Namespace of issuer
 	Subject         string `json:"sub"`       // Entity ID
 	Audience        string `json:"aud"`       // Role or client ID will be used here.
 	Expiry          int64  `json:"exp"`       // Expiration, as determined by the role or client.
@@ -492,7 +492,7 @@ func (i *IdentityStore) getOIDCConfig(ctx context.Context, s logical.Storage) (*
 		c.effectiveIssuer = i.redirectAddr
 	}
 
-	//c.effectiveIssuer += "/v1/" + ns.Path + issuerPath
+	// c.effectiveIssuer += "/v1/" + ns.Path + issuerPath
 	c.effectiveIssuer += "/v1/" + issuerPath
 
 	//if err := i.oidcCache.SetDefault(ns, "config", &c); err != nil {
@@ -923,7 +923,7 @@ func (i *IdentityStore) pathOIDCGenerateToken(ctx context.Context, req *logical.
 	now := time.Now()
 	idToken := idToken{
 		Issuer: config.effectiveIssuer,
-		//Namespace: ns.ID,
+		// Namespace: ns.ID,
 		Subject:  req.EntityID,
 		Audience: role.ClientID,
 		Expiry:   now.Add(expiry).Unix(),
@@ -953,7 +953,7 @@ func (i *IdentityStore) pathOIDCGenerateToken(ctx context.Context, req *logical.
 		String: role.Template,
 		Entity: identity.ToSDKEntity(e),
 		Groups: identity.ToSDKGroups(groups),
-		//NamespaceID: ns.ID,
+		// NamespaceID: ns.ID,
 	})
 	if err != nil {
 		i.Logger().Warn("error populating OIDC token template", "template", role.Template, "error", err)
@@ -1779,7 +1779,7 @@ func (i *IdentityStore) generatePublicJWKS(ctx context.Context, s logical.Storag
 }
 
 func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Storage) (time.Time, error) {
-	//var didUpdate bool
+	// var didUpdate bool
 
 	i.oidcLock.Lock()
 	defer i.oidcLock.Unlock()
@@ -1860,7 +1860,7 @@ func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Stor
 				i.Logger().Error("error writing key", "key", key.name, "error", err)
 				continue
 			}
-			//didUpdate = true
+			// didUpdate = true
 		}
 	}
 
@@ -1873,7 +1873,7 @@ func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Stor
 				nextExpiration = now
 				continue
 			}
-			//didUpdate = true
+			// didUpdate = true
 			i.Logger().Debug("deleted OIDC public key", "key_id", keyID)
 		}
 	}

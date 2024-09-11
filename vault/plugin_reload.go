@@ -139,7 +139,7 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	}
 
 	// Fast-path out if the backend doesn't exist
-	//raw, ok := c.router.root.Get(entry.Namespace().Path + path)
+	// raw, ok := c.router.root.Get(entry.Namespace().Path + path)
 	raw, ok := c.router.root.Get(path)
 	if !ok {
 		return nil
@@ -219,7 +219,7 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	// Set the backend back
 	re.backend = backend
 
-	//if backend != nil {
+	// if backend != nil {
 	// Initialize the backend after reload. This is a no-op for backends < v5 which
 	// rely on lazy loading for initialization. v5 backends do not rely on lazy loading
 	// for initialization unless the plugin process is killed. Reload of a v5 backend

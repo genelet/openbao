@@ -179,13 +179,13 @@ func (m *RollbackManager) triggerRollbacks() {
 		}
 
 		// When the mount is filtered, the backend will be nil
-		//ctx := namespace.ContextWithNamespace(m.quitContext, e.namespace)
+		// ctx := namespace.ContextWithNamespace(m.quitContext, e.namespace)
 		ctx := context.Background()
 		backend := m.router.MatchingBackend(ctx, path)
 		if backend == nil {
 			continue
 		}
-		//fullPath := e.namespace.Path + path
+		// fullPath := e.namespace.Path + path
 		fullPath := path
 
 		// Start a rollback if necessary
@@ -267,7 +267,7 @@ func (m *RollbackManager) attemptRollback(ctx context.Context, fullPath string, 
 	// Invoke a RollbackOperation
 	req := &logical.Request{
 		Operation: logical.RollbackOperation,
-		//Path:      ns.TrimmedPath(fullPath),
+		// Path:      ns.TrimmedPath(fullPath),
 		Path: fullPath,
 	}
 

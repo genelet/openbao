@@ -165,8 +165,8 @@ func TestCore_EnableAudit_Local(t *testing.T) {
 				Type:     "noop",
 				UUID:     "abcd",
 				Accessor: "noop-abcd",
-				//NamespaceID: namespace.RootNamespaceID,
-				//namespace:   namespace.RootNamespace,
+				// NamespaceID: namespace.RootNamespaceID,
+				// namespace:   namespace.RootNamespace,
 			},
 			{
 				Table:    auditTableType,
@@ -174,8 +174,8 @@ func TestCore_EnableAudit_Local(t *testing.T) {
 				Type:     "noop",
 				UUID:     "bcde",
 				Accessor: "noop-bcde",
-				//NamespaceID: namespace.RootNamespaceID,
-				//namespace:   namespace.RootNamespace,
+				// NamespaceID: namespace.RootNamespaceID,
+				// namespace:   namespace.RootNamespace,
 			},
 		},
 	}
@@ -401,7 +401,7 @@ func TestAuditBroker_LogRequest(t *testing.T) {
 		if !reflect.DeepEqual(a.Req[0], req) {
 			t.Fatalf("Bad: %#v\n wanted %#v", a.Req[0], req)
 		}
-		//if !reflect.DeepEqual(a.ReqErrs[0], reqErrs) {
+		// if !reflect.DeepEqual(a.ReqErrs[0], reqErrs) {
 		if !strings.Contains(a.ReqErrs[0].Error(), reqErrs.Error()) {
 			t.Fatalf("Bad: %#v", a.ReqErrs[0])
 		}
@@ -503,7 +503,7 @@ func TestAuditBroker_LogResponse(t *testing.T) {
 		if !reflect.DeepEqual(a.Resp[0], resp) {
 			t.Fatalf("Bad: %#v", a.Resp[0])
 		}
-		//if !reflect.DeepEqual(a.RespErrs[0], respErr) {
+		// if !reflect.DeepEqual(a.RespErrs[0], respErr) {
 		if !strings.Contains(a.RespErrs[0].Error(), respErr.Error()) {
 			t.Fatalf("Expected\n%v\nGot\n%#v", respErr, a.RespErrs[0])
 		}

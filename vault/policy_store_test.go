@@ -273,7 +273,7 @@ func testPolicyStoreACL(t *testing.T, ps *PolicyStore) {
 	}
 
 	ctx = context.Background()
-	//acl, err := ps.ACL(ctx, nil, map[string][]string{ns.ID: {"dev", "ops"}})
+	// acl, err := ps.ACL(ctx, nil, map[string][]string{ns.ID: {"dev", "ops"}})
 	acl, err := ps.ACL(ctx, nil, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -335,7 +335,7 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 	tests := map[string]struct {
 		policyStoreKey   string
 		policyStoreValue any
-		//paramNamespace       string
+		// paramNamespace       string
 		paramPolicyName      string
 		paramPolicyType      PolicyType
 		isErrorExpected      bool
@@ -344,14 +344,14 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 		"happy-acl": {
 			policyStoreKey:   "1AbcD/policy1",
 			policyStoreValue: PolicyTypeACL,
-			//paramNamespace:   "1AbcD",
+			// paramNamespace:   "1AbcD",
 			paramPolicyName: "policy1",
 			paramPolicyType: PolicyTypeACL,
 		},
 		"not-in-map-acl": {
 			policyStoreKey:   "2WxyZ/policy2",
 			policyStoreValue: PolicyTypeACL,
-			//paramNamespace:       "1AbcD",
+			// paramNamespace:       "1AbcD",
 			paramPolicyName:      "policy1",
 			isErrorExpected:      true,
 			expectedErrorMessage: "policy does not exist in type map",
@@ -359,7 +359,7 @@ func TestPolicyStore_GetNonEGPPolicyType(t *testing.T) {
 		"unknown-policy-type": {
 			policyStoreKey:   "1AbcD/policy1",
 			policyStoreValue: 7,
-			//paramNamespace:       "1AbcD",
+			// paramNamespace:       "1AbcD",
 			paramPolicyName:      "policy1",
 			isErrorExpected:      true,
 			expectedErrorMessage: "unknown policy type for: 1AbcD/policy1",

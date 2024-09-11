@@ -291,7 +291,7 @@ func (c *Core) fetchACLTokenEntryAndEntity(ctx context.Context, req *logical.Req
 	//}
 
 	// Add identity policies from all the namespaces
-	//entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
+	// entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, tokenNS, te.EntityID, te.NoIdentityPolicies)
 	entity, identityPolicies, err := c.fetchEntityAndDerivedPolicies(ctx, te.EntityID, te.NoIdentityPolicies)
 	if err != nil {
 		return nil, nil, nil, nil, ErrInternalError
@@ -532,7 +532,7 @@ func (c *Core) switchedLockHandleRequest(httpCtx context.Context, req *logical.R
 	//	return nil, fmt.Errorf("could not parse namespace from http context: %w", err)
 	//}
 
-	//ctx = namespace.ContextWithNamespace(ctx, ns)
+	// ctx = namespace.ContextWithNamespace(ctx, ns)
 	inFlightReqID, ok := httpCtx.Value(logical.CtxKeyInFlightRequestID{}).(string)
 	if ok {
 		ctx = context.WithValue(ctx, logical.CtxKeyInFlightRequestID{}, inFlightReqID)
@@ -920,7 +920,7 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 			// valid request (this is the token's final use). We pass the ID in
 			// directly just to be safe in case something else modifies te later.
 			defer func(id string) {
-				//nsActiveCtx := namespace.ContextWithNamespace(c.activeContext, ns)
+				// nsActiveCtx := namespace.ContextWithNamespace(c.activeContext, ns)
 				nsActiveCtx := c.activeContext
 				leaseID, err := c.expiration.CreateOrFetchRevocationLeaseByToken(nsActiveCtx, te)
 				if err == nil {
@@ -1108,13 +1108,13 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 
 			// Count the lease creation
 			ttl_label := metricsutil.TTLBucket(resp.Secret.TTL)
-			//mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
+			// mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
 			mountPointWithoutNs := req.MountPoint
 			c.MetricSink().IncrCounterWithLabels(
 				[]string{"secret", "lease", "creation"},
 				1,
 				[]metrics.Label{
-					//metricsutil.NamespaceLabel(ns),
+					// metricsutil.NamespaceLabel(ns),
 					{Name: "secret_engine", Value: req.MountType},
 					{Name: "mount_point", Value: mountPointWithoutNs},
 					{Name: "creation_ttl", Value: ttl_label},
@@ -1177,7 +1177,7 @@ func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp
 					TTL:      auth.TTL,
 					Policies: auth.TokenPolicies,
 					Path:     resp.Auth.CreationPath,
-					//NamespaceID: ns.ID,
+					// NamespaceID: ns.ID,
 				}
 
 				// Only logins apply to role based quotas, so we can omit the role here, as we are not logging in.
@@ -1523,8 +1523,8 @@ func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (re
 				respAuth := &MFACachedAuthResponse{
 					CachedAuth:  resp.Auth,
 					RequestPath: req.Path,
-					//RequestNSID:           ns.ID,
-					//RequestNSPath:         ns.Path,
+					// RequestNSID:           ns.ID,
+					// RequestNSPath:         ns.Path,
 					RequestConnRemoteAddr: req.Connection.RemoteAddr, // this is needed for the DUO method
 					TimeOfStorage:         time.Now(),
 					RequestID:             mfaRequestID,
@@ -1642,7 +1642,7 @@ func (c *Core) LoginCreateToken(ctx context.Context, reqPath, mountPoint, role s
 	}
 
 	auth.TokenPolicies = policyutil.SanitizePolicies(auth.Policies, !auth.NoDefaultPolicy)
-	//allPolicies := policyutil.SanitizePolicies(append(auth.TokenPolicies, identityPolicies[ns.ID]...), policyutil.DoNotAddDefaultPolicy)
+	// allPolicies := policyutil.SanitizePolicies(append(auth.TokenPolicies, identityPolicies[ns.ID]...), policyutil.DoNotAddDefaultPolicy)
 	allPolicies := policyutil.SanitizePolicies(auth.TokenPolicies, policyutil.DoNotAddDefaultPolicy)
 
 	// Prevent internal policies from being assigned to tokens. We check
@@ -1670,22 +1670,22 @@ func (c *Core) LoginCreateToken(ctx context.Context, reqPath, mountPoint, role s
 		return false, logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
 	}
 
-	//auth.IdentityPolicies = policyutil.SanitizePolicies(identityPolicies[ns.ID], policyutil.DoNotAddDefaultPolicy)
+	// auth.IdentityPolicies = policyutil.SanitizePolicies(identityPolicies[ns.ID], policyutil.DoNotAddDefaultPolicy)
 	auth.IdentityPolicies = policyutil.SanitizePolicies([]string{}, policyutil.DoNotAddDefaultPolicy)
-	//delete(identityPolicies, ns.ID)
+	// delete(identityPolicies, ns.ID)
 	auth.ExternalNamespacePolicies = identityPolicies
 	auth.Policies = allPolicies
 
 	// Count the successful token creation
 	ttl_label := metricsutil.TTLBucket(tokenTTL)
 	// Do not include namespace path in mount point; already present as separate label.
-	//mountPointWithoutNs := ns.TrimmedPath(mountPoint)
+	// mountPointWithoutNs := ns.TrimmedPath(mountPoint)
 	mountPointWithoutNs := mountPoint
 	c.metricSink.IncrCounterWithLabels(
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			//metricsutil.NamespaceLabel(ns),
+			// metricsutil.NamespaceLabel(ns),
 			{Name: "auth_method", Value: mountEntry.Type},
 			{Name: "mount_point", Value: mountPointWithoutNs},
 			{Name: "creation_ttl", Value: ttl_label},
@@ -1985,7 +1985,7 @@ func (c *Core) RegisterAuth(ctx context.Context, tokenTTL time.Duration, path st
 		EntityID:     auth.EntityID,
 		BoundCIDRs:   auth.BoundCIDRs,
 		Policies:     auth.TokenPolicies,
-		//NamespaceID:    ns.ID,
+		// NamespaceID:    ns.ID,
 		ExplicitMaxTTL: auth.ExplicitMaxTTL,
 		Period:         auth.Period,
 		Type:           auth.TokenType,
@@ -2067,7 +2067,7 @@ func (c *Core) LocalUpdateUserFailedLoginInfo(ctx context.Context, userKey Faile
 		mountEntry := c.router.MatchingMountByAccessor(userKey.mountAccessor)
 		if mountEntry == nil {
 			mountEntry = &MountEntry{}
-			//mountEntry.NamespaceID = namespace.RootNamespaceID
+			// mountEntry.NamespaceID = namespace.RootNamespaceID
 		}
 		userLockoutConfiguration := c.getUserLockoutConfiguration(mountEntry)
 

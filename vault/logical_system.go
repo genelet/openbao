@@ -251,7 +251,7 @@ func (b *SystemBackend) handleTidyLeases(ctx context.Context, req *logical.Reque
 	//}
 
 	go func() {
-		//tidyCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
+		// tidyCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
 		tidyCtx := b.Core.activeContext
 		err := b.Core.expiration.Tidy(tidyCtx)
 		if err != nil {
@@ -1236,7 +1236,7 @@ func (b *SystemBackend) handleUnmount(ctx context.Context, req *logical.Request,
 	// We return success when the mount does not exist to not expose if the
 	// mount existed or not
 	match := b.Core.router.MatchingMount(ctx, path)
-	//if match == "" || ns.Path+path != match {
+	// if match == "" || ns.Path+path != match {
 	if match == "" {
 		return nil, nil
 	}
@@ -1303,8 +1303,8 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("'to' path cannot contain trailing whitespace"), logical.ErrInvalidRequest
 	}
 
-	//fromPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, fromPath)
-	//toPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, toPath)
+	// fromPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, fromPath)
+	// toPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, toPath)
 
 	if err = validateMountPath(toPath); err != nil {
 		return handleError(fmt.Errorf("invalid destination mount: %v", err))
@@ -1385,7 +1385,7 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 // func (b *SystemBackend) moveMount(ns *namespace.Namespace, logger log.Logger, migrationID string, entry *MountEntry, fromPath, toPath string) error {
 func (b *SystemBackend) moveMount(logger log.Logger, migrationID string, entry *MountEntry, fromPath, toPath string) error {
 	logger.Info("Starting to update the mount table and revoke leases")
-	//revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
+	// revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
 	revokeCtx := b.Core.activeContext
 
 	var err error
@@ -2280,7 +2280,7 @@ func (b *SystemBackend) handleRevokePrefixCommon(_ context.Context,
 	var err error
 
 	// Invoke the expiration manager directly
-	//revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
+	// revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
 	revokeCtx := b.Core.activeContext
 	if force {
 		err = b.Core.expiration.RevokeForce(revokeCtx, prefix)
@@ -2625,7 +2625,7 @@ func (b *SystemBackend) handleDisableAuth(ctx context.Context, req *logical.Requ
 	// We return success when the mount does not exist to not expose if the
 	// mount existed or not
 	match := b.Core.router.MatchingMount(ctx, fullPath)
-	//if match == "" || ns.Path+fullPath != match {
+	// if match == "" || ns.Path+fullPath != match {
 	if match == "" {
 		return nil, nil
 	}
@@ -2722,7 +2722,7 @@ func (b *SystemBackend) handlePoliciesSet(policyType PolicyType) framework.Opera
 		policy := &Policy{
 			Name: strings.ToLower(name),
 			Type: policyType,
-			//namespace: ns,
+			// namespace: ns,
 		}
 		if policy.Name == "" {
 			return logical.ErrorResponse("policy name must be provided in the URL"), nil
@@ -3338,7 +3338,7 @@ func (b *SystemBackend) handleWrappingUnwrap(ctx context.Context, req *logical.R
 	//	return nil, errors.New("token is not from a valid namespace")
 	//}
 
-	//unwrapCtx := namespace.ContextWithNamespace(ctx, unwrapNS)
+	// unwrapCtx := namespace.ContextWithNamespace(ctx, unwrapNS)
 	unwrapCtx := ctx
 	var response string
 	switch te.Policies[0] {
@@ -3672,7 +3672,7 @@ func (b *SystemBackend) handleWrappingLookup(ctx context.Context, req *logical.R
 	//	return nil, errors.New("token is not from a valid namespace")
 	//}
 
-	//lookupCtx := namespace.ContextWithNamespace(ctx, lookupNS)
+	// lookupCtx := namespace.ContextWithNamespace(ctx, lookupNS)
 	lookupCtx := ctx
 	cubbyReq := &logical.Request{
 		Operation:   logical.ReadOperation,
@@ -3904,7 +3904,7 @@ func hasMountAccess(ctx context.Context, acl *ACL, path string) bool {
 
 	// If a policy is giving us direct access to the mount path then we can do
 	// a fast return.
-	//capabilities := acl.Capabilities(ctx, ns.TrimmedPath(path))
+	// capabilities := acl.Capabilities(ctx, ns.TrimmedPath(path))
 	capabilities := acl.Capabilities(ctx, path)
 	if !strutil.StrListContains(capabilities, DenyCapability) {
 		return true
@@ -3997,10 +3997,10 @@ func (b *SystemBackend) pathInternalUIMountsRead(ctx context.Context, req *logic
 
 		if isAuthed {
 			if me.Table == "auth" {
-				//return hasMountAccess(ctx, acl, me.Namespace().Path+me.Table+"/"+me.Path)
+				// return hasMountAccess(ctx, acl, me.Namespace().Path+me.Table+"/"+me.Path)
 				return hasMountAccess(ctx, acl, me.Table+"/"+me.Path)
 			} else {
-				//return hasMountAccess(ctx, acl, me.Namespace().Path+me.Path)
+				// return hasMountAccess(ctx, acl, me.Namespace().Path+me.Path)
 				return hasMountAccess(ctx, acl, me.Path)
 			}
 		}
@@ -4010,7 +4010,7 @@ func (b *SystemBackend) pathInternalUIMountsRead(ctx context.Context, req *logic
 
 	b.Core.mountsLock.RLock()
 	for _, entry := range b.Core.mounts.Entries {
-		//if ns.ID == entry.NamespaceID && hasAccess(ctx, entry) {
+		// if ns.ID == entry.NamespaceID && hasAccess(ctx, entry) {
 		if hasAccess(ctx, entry) {
 			if isAuthed {
 				// If this is an authed request return all the mount info
@@ -4028,7 +4028,7 @@ func (b *SystemBackend) pathInternalUIMountsRead(ctx context.Context, req *logic
 
 	b.Core.authLock.RLock()
 	for _, entry := range b.Core.auth.Entries {
-		//if ns.ID == entry.NamespaceID && hasAccess(ctx, entry) {
+		// if ns.ID == entry.NamespaceID && hasAccess(ctx, entry) {
 		if hasAccess(ctx, entry) {
 			if isAuthed {
 				// If this is an authed request return all the mount info

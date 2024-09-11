@@ -3213,13 +3213,13 @@ func (c *Core) loadLoginMFAConfigs(ctx context.Context) error {
 	eConfigs := make([]*mfa.MFAEnforcementConfig, 0)
 	allNamespaces := c.collectNamespaces()
 	for _, ns := range allNamespaces {
-		//err := c.loginMFABackend.loadMFAMethodConfigs(ctx, ns)
+		// err := c.loginMFABackend.loadMFAMethodConfigs(ctx, ns)
 		err := c.loginMFABackend.loadMFAMethodConfigs(ctx)
 		if err != nil {
 			return fmt.Errorf("error loading MFA method Config, namespaceid %s, error: %w", ns.ID, err)
 		}
 
-		//loadedConfigs, err := c.loginMFABackend.loadMFAEnforcementConfigs(ctx, ns)
+		// loadedConfigs, err := c.loginMFABackend.loadMFAEnforcementConfigs(ctx, ns)
 		loadedConfigs, err := c.loginMFABackend.loadMFAEnforcementConfigs(ctx)
 		if err != nil {
 			return fmt.Errorf("error loading MFA enforcement Config, namespaceid %s, error: %w", ns.ID, err)
@@ -3239,8 +3239,8 @@ func (c *Core) loadLoginMFAConfigs(ctx context.Context) error {
 type MFACachedAuthResponse struct {
 	CachedAuth  *logical.Auth
 	RequestPath string
-	//RequestNSID           string
-	//RequestNSPath         string
+	// RequestNSID           string
+	// RequestNSPath         string
 	RequestConnRemoteAddr string
 	TimeOfStorage         time.Time
 	RequestID             string
@@ -3686,7 +3686,7 @@ func (c *Core) aliasNameFromLoginRequest(ctx context.Context, req *logical.Reque
 	//}
 
 	// ns path is added while checking matching backend
-	//mountPath := strings.TrimPrefix(req.MountPoint, ns.Path)
+	// mountPath := strings.TrimPrefix(req.MountPoint, ns.Path)
 	mountPath := req.MountPoint
 
 	matchingBackend := c.router.MatchingBackend(ctx, mountPath)

@@ -1232,7 +1232,7 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, mountPath string) 
 	}
 
 	// Update mounts for everything without a path prefix or role
-	//err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
+	// err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
 	err := updateMounts(indexNamespaceMount, mountPath, false, false)
 	if err != nil {
 		return err

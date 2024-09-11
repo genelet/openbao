@@ -560,18 +560,18 @@ func (b *basicAuditor) AuditResponse(ctx context.Context, input *logical.LogInpu
 type genericAuditor struct {
 	c         *Core
 	mountType string
-	//namespace *namespace.Namespace
+	// namespace *namespace.Namespace
 }
 
 func (g genericAuditor) AuditRequest(ctx context.Context, input *logical.LogInput) error {
-	//ctx = namespace.ContextWithNamespace(ctx, g.namespace)
+	// ctx = namespace.ContextWithNamespace(ctx, g.namespace)
 	logInput := *input
 	logInput.Type = g.mountType + "-request"
 	return g.c.auditBroker.LogRequest(ctx, &logInput, g.c.auditedHeaders)
 }
 
 func (g genericAuditor) AuditResponse(ctx context.Context, input *logical.LogInput) error {
-	//ctx = namespace.ContextWithNamespace(ctx, g.namespace)
+	// ctx = namespace.ContextWithNamespace(ctx, g.namespace)
 	logInput := *input
 	logInput.Type = g.mountType + "-response"
 	return g.c.auditBroker.LogResponse(ctx, &logInput, g.c.auditedHeaders)

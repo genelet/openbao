@@ -114,7 +114,7 @@ type MFABackend struct {
 	mfaLock   *sync.RWMutex
 	db        *memdb.MemDB
 	mfaLogger hclog.Logger
-	//namespacer  Namespacer
+	// namespacer  Namespacer
 	methodTable string
 	usedCodes   *cache.Cache
 }
@@ -142,7 +142,7 @@ func NewMFABackend(core *Core, logger hclog.Logger, prefix string, schemaFuncs [
 		mfaLock:   &sync.RWMutex{},
 		db:        db,
 		mfaLogger: logger.Named("mfa"),
-		//namespacer:  core,
+		// namespacer:  core,
 		methodTable: prefix,
 	}
 }
@@ -325,7 +325,7 @@ func (i *IdentityStore) handleMFAMethodUpdateCommon(ctx context.Context, _ *logi
 		mConfig = &mfa.Config{
 			ID:   configID,
 			Type: methodType,
-			//NamespaceID: ns.ID,
+			// NamespaceID: ns.ID,
 		}
 	}
 
@@ -592,7 +592,7 @@ func (i *IdentityStore) handleLoginMFAAdminDestroyUpdate(ctx context.Context, re
 // func (b *LoginMFABackend) loadMFAMethodConfigs(ctx context.Context, ns *namespace.Namespace) error {
 func (b *LoginMFABackend) loadMFAMethodConfigs(ctx context.Context) error {
 	b.mfaLogger.Trace("loading login MFA configurations")
-	//barrierView, err := b.Core.barrierViewForNamespace(ns.ID)
+	// barrierView, err := b.Core.barrierViewForNamespace(ns.ID)
 	barrierView, err := b.Core.barrierViewForNamespace()
 	if err != nil {
 		return fmt.Errorf("error getting namespace view,  error %w", err)
@@ -919,7 +919,7 @@ func (i *IdentityStore) handleMFALoginEnforcementUpdate(ctx context.Context, req
 		}
 		eConfig = &mfa.MFAEnforcementConfig{
 			Name: name,
-			//NamespaceID: ns.ID,
+			// NamespaceID: ns.ID,
 			ID: configID,
 		}
 	}
@@ -1367,7 +1367,7 @@ func (b *LoginMFABackend) mfaLoginEnforcementList(ctx context.Context) ([]string
 	txn := b.db.Txn(false)
 
 	// get all the login enforcements in our namespace
-	//iter, err := txn.Get(memDBMFALoginEnforcementsTable, "namespace", ns.ID)
+	// iter, err := txn.Get(memDBMFALoginEnforcementsTable, "namespace", ns.ID)
 	iter, err := txn.Get(memDBMFALoginEnforcementsTable, "namespace", namespace.RootNamespace)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch iterator for login enforcement configs in memdb: %w", err)
@@ -1759,7 +1759,7 @@ ECONFIG_LOOP:
 		//	return nil, fmt.Errorf("failed to find the MFAEnforcementConfig namespace")
 		//}
 
-		//if eConfig == nil || eConfigNS == nil || (eConfigNS.ID != ns.ID && !ns.HasParent(eConfigNS)) {
+		// if eConfig == nil || eConfigNS == nil || (eConfigNS.ID != ns.ID && !ns.HasParent(eConfigNS)) {
 		if eConfig == nil {
 			continue
 		}
@@ -2618,7 +2618,7 @@ func (b *LoginMFABackend) MemDBMFAConfigByNameInTxn(ctx context.Context, txn *me
 	//	return nil, err
 	//}
 
-	//mConfigRaw, err := txn.First(b.methodTable, "name", ns.ID, mConfigName)
+	// mConfigRaw, err := txn.First(b.methodTable, "name", ns.ID, mConfigName)
 	mConfigRaw, err := txn.First(b.methodTable, "name", namespace.RootNamespace, mConfigName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch MFA config from memdb using name: %w", err)
