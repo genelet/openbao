@@ -262,7 +262,7 @@ func (t *MountTable) remove(ctx context.Context, path string) (*MountEntry, erro
 
 	for i := 0; i < n; i++ {
 		if entry := t.Entries[i]; entry.Path == path && entry.NamespaceID == ns.ID {
-			//if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
+			// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
 			t.Entries[i], t.Entries[n-1] = t.Entries[n-1], nil
 			t.Entries = t.Entries[:n-1]
 			return entry, nil
@@ -546,7 +546,7 @@ func (c *Core) decodeMountTable(ctx context.Context, raw []byte) (*MountTable, e
 		//	continue
 		//}
 
-		//entry.namespace = ns
+		// entry.namespace = ns
 		mountEntries = append(mountEntries, entry)
 	}
 
@@ -606,10 +606,10 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	}
 
 	entry.NamespaceID = ns.ID
-	//entry.namespace = ns
+	// entry.namespace = ns
 
 	// Ensure the cache is populated, don't need the result
-	//NamespaceByID(ctx, ns.ID, c)
+	// NamespaceByID(ctx, ns.ID, c)
 
 	// Basic check for matching names
 	for _, ent := range c.mounts.Entries {

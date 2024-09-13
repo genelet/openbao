@@ -1789,7 +1789,7 @@ func (i *IdentityStore) generatePublicJWKS(ctx context.Context, s logical.Storag
 }
 
 func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Storage) (time.Time, error) {
-	//var didUpdate bool
+	// var didUpdate bool
 
 	i.oidcLock.Lock()
 	defer i.oidcLock.Unlock()
@@ -1870,7 +1870,7 @@ func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Stor
 				i.Logger().Error("error writing key", "key", key.name, "error", err)
 				continue
 			}
-			//didUpdate = true
+			// didUpdate = true
 		}
 	}
 
@@ -1883,7 +1883,7 @@ func (i *IdentityStore) expireOIDCPublicKeys(ctx context.Context, s logical.Stor
 				nextExpiration = now
 				continue
 			}
-			//didUpdate = true
+			// didUpdate = true
 			i.Logger().Debug("deleted OIDC public key", "key_id", keyID)
 		}
 	}
@@ -1990,10 +1990,10 @@ func (i *IdentityStore) oidcPeriodicFunc(ctx context.Context) {
 		nextRun = now.Add(24 * time.Hour)
 		minJwksClientCacheDuration := time.Duration(math.MaxInt64)
 
-		//for _, ns := range i.core.ListNamespaces(true) {
-		//nsPath := ns.Path
+		// for _, ns := range i.core.ListNamespaces(true) {
+		// nsPath := ns.Path
 
-		//s := i.router.MatchingStorageByAPIPath(ctx, nsPath+"identity/oidc")
+		// s := i.router.MatchingStorageByAPIPath(ctx, nsPath+"identity/oidc")
 		s := i.router.MatchingStorageByAPIPath(ctx, "identity/oidc")
 
 		if s != nil {

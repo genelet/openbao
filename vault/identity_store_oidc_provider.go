@@ -2081,14 +2081,14 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 		Path:         req.Path,
 		TTL:          client.AccessTokenTTL,
 		CreationTime: accessTokenIssuedAt.Unix(),
-		//EntityID:           entity.ID,
+		// EntityID:           entity.ID,
 		NoIdentityPolicies: true,
 		Meta: map[string]string{
 			"oidc_token_type": "access token",
 		},
 		InternalMeta: map[string]string{
 			accessTokenClientIDMeta: client.ClientID,
-			//accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
+			// accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
 		},
 		InlinePolicy: fmt.Sprintf(`
 			path "identity/oidc/provider/%s/userinfo" {

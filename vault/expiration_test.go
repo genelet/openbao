@@ -1006,7 +1006,7 @@ func TestExpiration_Register_BatchToken(t *testing.T) {
 	}
 
 	err := exp.tokenStore.create(namespace.RootContext(nil), te)
-	//err := exp.tokenStore.create(context.Background(), te)
+	// err := exp.tokenStore.create(context.Background(), te)
 	if err != nil {
 		t.Fatal(err)
 	}

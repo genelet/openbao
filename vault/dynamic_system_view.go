@@ -125,7 +125,7 @@ func (e extendedSystemViewImpl) SudoPrivilege(ctx context.Context, path string, 
 	req := new(logical.Request)
 	req.Operation = logical.ReadOperation
 	req.Path = path
-	//authResults := acl.AllowOperation(namespace.RootContext(ctx), req, true)
+	// authResults := acl.AllowOperation(namespace.RootContext(ctx), req, true)
 	authResults := acl.AllowOperation(ctx, req, true)
 	return authResults.RootPrivs
 }

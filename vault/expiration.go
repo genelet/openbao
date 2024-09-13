@@ -286,7 +286,7 @@ func (r *revocationJob) OnFailure(err error) {
 }
 
 func expireLeaseStrategyFairsharing(ctx context.Context, m *ExpirationManager, leaseID string, ns *namespace.Namespace) {
-	//nsCtx := namespace.ContextWithNamespace(ctx, ns)
+	// nsCtx := namespace.ContextWithNamespace(ctx, ns)
 	nsCtx := ctx
 	mountAccessor := m.getLeaseMountAccessorLocked(ctx, leaseID)
 
@@ -1620,7 +1620,7 @@ func (m *ExpirationManager) RegisterAuth(ctx context.Context, te *logical.TokenE
 		LoginRole:   loginRole,
 		IssueTime:   time.Now(),
 		ExpireTime:  authExpirationTime,
-		//namespace:   tokenNS,
+		// namespace:   tokenNS,
 		namespace: ns,
 		Version:   1,
 	}
@@ -2239,8 +2239,8 @@ func (m *ExpirationManager) CreateOrFetchRevocationLeaseByToken(ctx context.Cont
 	}
 	leaseID := path.Join(te.Path, saltedID)
 
-	//if tokenNS.ID != namespace.RootNamespaceID {
-	//leaseID = fmt.Sprintf("%s.%s", leaseID, tokenNS.ID)
+	// if tokenNS.ID != namespace.RootNamespaceID {
+	// leaseID = fmt.Sprintf("%s.%s", leaseID, tokenNS.ID)
 	if te.NamespaceID != namespace.RootNamespaceID {
 		leaseID = fmt.Sprintf("%s.%s", leaseID, te.NamespaceID)
 	}
@@ -2574,7 +2574,7 @@ func (m *ExpirationManager) getNamespaceFromLeaseID(ctx context.Context, leaseID
 		return nil, err
 	}
 	if nsID != "" {
-		//leaseNS, err = NamespaceByID(ctx, nsID, m.core)
+		// leaseNS, err = NamespaceByID(ctx, nsID, m.core)
 		leaseNS.ID = nsID
 	}
 

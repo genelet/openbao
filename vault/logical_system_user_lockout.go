@@ -108,7 +108,6 @@ func (b *SystemBackend) getLockedUsersResponses(ctx context.Context, mountAccess
 
 	// get all the namespaces of locked users
 	nsIDs, err := b.Core.barrier.List(ctx, coreLockedUsersPath)
-
 	if err != nil {
 		return 0, nil, err
 	}

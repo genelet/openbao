@@ -57,7 +57,7 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		router:       core.router,
 		redirectAddr: core.redirectAddr,
 		localNode:    core,
-		//namespacer:    core,
+		// namespacer:    core,
 		metrics:       core.MetricSink(),
 		totpPersister: core,
 		groupUpdater:  core,
@@ -1160,7 +1160,7 @@ func (i *IdentityStore) CreateEntity(ctx context.Context) (*identity.Entity, err
 	}
 
 	// Emit a metric for the new entity
-	//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
+	// ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
 	ns, err := namespace.FromContext(ctx)
 	var nsLabel metrics.Label
 	if err != nil {
@@ -1269,7 +1269,7 @@ func (i *IdentityStore) CreateOrFetchEntity(ctx context.Context, alias *logical.
 		}
 
 		// Emit a metric for the new entity
-		//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
+		// ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
 		ns, err := namespace.FromContext(ctx)
 		var nsLabel metrics.Label
 		if err != nil {

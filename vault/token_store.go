@@ -974,7 +974,7 @@ func (ts *TokenStore) tokenStoreAccessorList(ctx context.Context, req *logical.R
 			continue
 		}
 
-		//if aEntry.NamespaceID == ns.ID {
+		// if aEntry.NamespaceID == ns.ID {
 		ret = append(ret, aEntry.AccessorID)
 		//}
 	}
@@ -997,7 +997,7 @@ func (ts *TokenStore) createAccessor(ctx context.Context, entry *logical.TokenEn
 		return err
 	}
 
-	//tokenNS, err := NamespaceByID(ctx, entry.NamespaceID, ts.core)
+	// tokenNS, err := NamespaceByID(ctx, entry.NamespaceID, ts.core)
 	tokenNS, err := namespace.FromContext(ctx)
 	if err != nil {
 		return err
@@ -1116,7 +1116,7 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 			entry.ID = fmt.Sprintf("%s.%s", entry.ID, tokenNSID)
 		}
 
-		//if tokenNS.ID != namespace.RootNamespaceID || strings.HasPrefix(entry.ID, consts.ServiceTokenPrefix) || strings.HasPrefix(entry.ID, consts.LegacyServiceTokenPrefix) {
+		// if tokenNS.ID != namespace.RootNamespaceID || strings.HasPrefix(entry.ID, consts.ServiceTokenPrefix) || strings.HasPrefix(entry.ID, consts.LegacyServiceTokenPrefix) {
 		if tokenNSID != ns.ID || strings.HasPrefix(entry.ID, consts.ServiceTokenPrefix) || strings.HasPrefix(entry.ID, consts.LegacyServiceTokenPrefix) {
 			if entry.CubbyholeID == "" {
 				cubbyholeID, err := base62.Random(TokenLength)
@@ -2019,7 +2019,7 @@ func (ts *TokenStore) revokeTreeInternal(ctx context.Context, id string) error {
 		saltedCtx := ctx
 		saltedNS := ns
 		saltedID, saltedNSID := namespace.SplitIDFromString(id)
-		//if saltedNSID != "" {
+		// if saltedNSID != "" {
 		if saltedNSID != "" && saltedNSID != ns.ID {
 			//saltedNS, err = NamespaceByID(ctx, saltedNSID, ts.core)
 			//if err != nil {
@@ -2029,7 +2029,7 @@ func (ts *TokenStore) revokeTreeInternal(ctx context.Context, id string) error {
 			//	return errors.New("failed to find namespace for token revocation")
 			//}
 
-			//saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
+			// saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
 			saltedNS = &namespace.Namespace{ID: saltedNSID, Path: ns.Path}
 			saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
 		}
@@ -2105,7 +2105,7 @@ func (ts *TokenStore) lookupByAccessor(ctx context.Context, id string, salted, t
 	lookupID := id
 	if !salted {
 		_, nsID := namespace.SplitIDFromString(id)
-		//if nsID != "" {
+		// if nsID != "" {
 		//	accessorNS, err := NamespaceByID(ctx, nsID, ts.core)
 		//	if err != nil {
 		//		return nil, err
