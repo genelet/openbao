@@ -31,25 +31,25 @@ func (c *Core) AddIrrevocableLease(ctx context.Context, pathPrefix string) (*bas
 		return nil, fmt.Errorf("error generating uuid: %w", err)
 	}
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, fmt.Errorf("error getting namespace from context: %w", err)
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting namespace from context: %w", err)
+	}
 	//if ns == nil {
 	//	ns = namespace.RootNamespace
 	//}
 
 	leaseID := path.Join(pathPrefix, "lease"+uuid)
 
-	//if ns != namespace.RootNamespace {
-	//	leaseID = fmt.Sprintf("%s.%s", leaseID, ns.ID)
-	//}
+	if ns.ID != namespace.RootNamespaceID {
+		leaseID = fmt.Sprintf("%s.%s", leaseID, ns.ID)
+	}
 
 	randomTimeDelta := time.Duration(rand.Int31n(24))
 	le := &leaseEntry{
-		LeaseID: leaseID,
-		Path:    pathPrefix,
-		// namespace:  ns,
+		LeaseID:    leaseID,
+		Path:       pathPrefix,
+		namespace:  ns,
 		IssueTime:  time.Now(),
 		ExpireTime: time.Now().Add(randomTimeDelta * time.Hour),
 		RevokeErr:  "some error message",

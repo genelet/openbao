@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	//"github.com/openbao/openbao/command/agentproxyshared/auth"
 	"github.com/openbao/openbao/helper/identity"
-	"github.com/openbao/openbao/helper/namespace"
+	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/random"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/license"
@@ -124,7 +125,8 @@ func (e extendedSystemViewImpl) SudoPrivilege(ctx context.Context, path string, 
 	req := new(logical.Request)
 	req.Operation = logical.ReadOperation
 	req.Path = path
-	authResults := acl.AllowOperation(namespace.RootContext(ctx), req, true)
+	//authResults := acl.AllowOperation(namespace.RootContext(ctx), req, true)
+	authResults := acl.AllowOperation(ctx, req, true)
 	return authResults.RootPrivs
 }
 

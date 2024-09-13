@@ -6,6 +6,8 @@ package vault
 import (
 	"context"
 	"errors"
+
+	//	"log"
 	"sync"
 
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -62,6 +64,7 @@ func (v *BarrierView) ListPage(ctx context.Context, prefix string, after string,
 }
 
 func (v *BarrierView) Get(ctx context.Context, key string) (*logical.StorageEntry, error) {
+	//log.Printf("barrier view 00000001 get entry %s", key)
 	return v.storage.Get(ctx, key)
 }
 
@@ -75,7 +78,7 @@ func (v *BarrierView) Put(ctx context.Context, entry *logical.StorageEntry) erro
 	if roErr != nil {
 		return roErr
 	}
-
+	//log.Printf("barrier view 00000002 put entry %s => %s", entry.Key, string(entry.Value))
 	return v.storage.Put(ctx, entry)
 }
 
@@ -85,7 +88,7 @@ func (v *BarrierView) Delete(ctx context.Context, key string) error {
 	if roErr != nil {
 		return roErr
 	}
-
+	//log.Printf("barrier view 00000003 delete key %s", key)
 	return v.storage.Delete(ctx, key)
 }
 

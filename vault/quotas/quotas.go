@@ -1196,8 +1196,7 @@ func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error 
 // HandleBackendDisabling updates the quota subsystem with the disabling of auth
 // or secret engine disabling. This should only be called on the primary cluster
 // node.
-// func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath string) error {
-func (m *Manager) HandleBackendDisabling(ctx context.Context, mountPath string) error {
+func (m *Manager) HandleBackendDisabling(ctx context.Context, nsPath, mountPath string) error {
 	m.quotaLock.Lock()
 	m.dbAndCacheLock.RLock()
 	defer m.quotaLock.Unlock()
@@ -1208,9 +1207,9 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, mountPath string) 
 
 	// nsPath would have been made non-empty during insertion. Use non-empty value
 	// during query as well.
-	//if nsPath == "" {
-	//	nsPath = "root"
-	//}
+	if nsPath == "" {
+		nsPath = "root"
+	}
 
 	updateMounts := func(idx string, args ...interface{}) error {
 		for _, quotaType := range quotaTypes() {
@@ -1233,19 +1232,19 @@ func (m *Manager) HandleBackendDisabling(ctx context.Context, mountPath string) 
 
 	// Update mounts for everything without a path prefix or role
 	// err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
-	err := updateMounts(indexNamespaceMount, mountPath, false, false)
+	err := updateMounts(indexNamespaceMount, nsPath, mountPath, false, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a path prefix
-	err = updateMounts(indexNamespaceMount, mountPath, true, false)
+	err = updateMounts(indexNamespaceMount, nsPath, mountPath, true, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a role
-	err = updateMounts(indexNamespaceMount, mountPath, false, true)
+	err = updateMounts(indexNamespaceMount, nsPath, mountPath, false, true)
 	if err != nil {
 		return err
 	}

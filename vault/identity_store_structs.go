@@ -67,11 +67,11 @@ type IdentityStore struct {
 	// oidcCache stores common response data as well as when the periodic func needs
 	// to run. This is conservatively managed, and most writes to the OIDC endpoints
 	// will invalidate the cache.
-	// oidcCache *oidcCache
+	oidcCache *oidcCache
 
 	// oidcAuthCodeCache stores OIDC authorization codes to be exchanged
 	// for an ID token during an authorization code flow.
-	// oidcAuthCodeCache *oidcCache
+	oidcAuthCodeCache *oidcCache
 
 	// logger is the server logger copied over from core
 	logger log.Logger

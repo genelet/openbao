@@ -555,6 +555,7 @@ func testMakeTokenViaBackend(t testing.TB, ts *TokenStore, root, client, ttl str
 	resp := testMakeTokenViaRequest(t, ts, req)
 
 	if resp.Auth.ClientToken != client {
+		t.Errorf("bad: %s => %s, %s, %s, %v, %v", resp.Auth.ClientToken, root, client, ttl, policy, batch)
 		t.Fatalf("bad: %#v", resp)
 	}
 }
@@ -578,14 +579,14 @@ func testMakeTokenViaRequestContext(t testing.TB, ctx context.Context, ts *Token
 		return resp
 	}
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	te := &logical.TokenEntry{
-		Path: resp.Auth.CreationPath,
-		// NamespaceID: ns.ID,
+		Path:        resp.Auth.CreationPath,
+		NamespaceID: ns.ID,
 	}
 
 	if resp.Auth.TokenType != logical.TokenTypeBatch {

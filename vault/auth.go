@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/go-uuid"
 	"github.com/openbao/openbao/builtin/plugin"
+	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/versions"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -238,10 +239,10 @@ func (c *Core) disableCredential(ctx context.Context, path string) error {
 func (c *Core) disableCredentialInternal(ctx context.Context, path string, updateStorage bool) error {
 	path = credentialRoutePrefix + path
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Verify exact match of the route
 	match := c.router.MatchingMount(ctx, path)
@@ -311,8 +312,7 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	}
 
 	if c.quotaManager != nil {
-		// if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
-		if err := c.quotaManager.HandleBackendDisabling(ctx, path); err != nil {
+		if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
 			c.logger.Error("failed to update quotas after disabling auth", "path", path, "error", err)
 			return err
 		}

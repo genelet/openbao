@@ -1005,7 +1005,8 @@ func TestExpiration_Register_BatchToken(t *testing.T) {
 		Parent:       rootToken,
 	}
 
-	err := exp.tokenStore.create(context.Background(), te)
+	err := exp.tokenStore.create(namespace.RootContext(nil), te)
+	//err := exp.tokenStore.create(context.Background(), te)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2536,7 +2537,7 @@ func TestExpiration_PersistLoadDelete(t *testing.T) {
 		IssueTime:       lastTime,
 		ExpireTime:      lastTime,
 		LastRenewalTime: lastTime,
-		// namespace:       namespace.RootNamespace,
+		namespace:       namespace.RootNamespace,
 	}
 	if err := exp.persistEntry(namespace.RootContext(nil), le); err != nil {
 		t.Fatalf("err: %v", err)
@@ -3222,7 +3223,7 @@ func TestExpiration_unrecoverableErrorMakesIrrevocable(t *testing.T) {
 	makeJob := func() *revocationJob {
 		leaseID := registerOneLease(t, ctx, exp)
 
-		job, err := newRevocationJob(ctx, leaseID, exp)
+		job, err := newRevocationJob(ctx, leaseID, namespace.RootNamespace, exp)
 		if err != nil {
 			t.Fatalf("err making revocation job: %v", err)
 		}

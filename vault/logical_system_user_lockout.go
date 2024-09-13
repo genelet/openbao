@@ -5,6 +5,7 @@ package vault
 
 import (
 	"context"
+	"fmt"
 	//"fmt"
 	"sort"
 	"strings"
@@ -79,10 +80,10 @@ func (b *SystemBackend) getLockedUsersResponses(ctx context.Context, mountAccess
 	lockedUsersResponse := make([]*LockedUsersResponse, 0)
 	totalCounts := 0
 
-	//queryNS, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return 0, nil, err
-	//}
+	queryNS, err := namespace.FromContext(ctx)
+	if err != nil {
+		return 0, nil, err
+	}
 
 	if mountAccessor != "" {
 		// get the locked user response for mount_accessor, here for mount_accessor in request
@@ -95,73 +96,72 @@ func (b *SystemBackend) getLockedUsersResponses(ctx context.Context, mountAccess
 
 		totalCounts += totalCountForNSID
 		lockedUsersResponse = append(lockedUsersResponse, &LockedUsersResponse{
-			// NamespaceID:    queryNS.ID,
-			// NamespacePath:  queryNS.Path,
+			NamespaceID:    queryNS.ID,
+			NamespacePath:  queryNS.Path,
 			Counts:         totalCountForNSID,
 			MountAccessors: mountAccessorsResponse,
 		})
 		return totalCounts, lockedUsersResponse, nil
 	}
-	return 0, nil, nil
-	/*
-	   // no mount_accessor is provided in request, get information for current namespace and its child namespaces
 
-	   // get all the namespaces of locked users
-	   nsIDs, err := b.Core.barrier.List(ctx, coreLockedUsersPath)
+	// no mount_accessor is provided in request, get information for current namespace and its child namespaces
 
-	   	if err != nil {
-	   		return 0, nil, err
-	   	}
+	// get all the namespaces of locked users
+	nsIDs, err := b.Core.barrier.List(ctx, coreLockedUsersPath)
 
-	   // identify if the namespaces must be included in response and get counts
+	if err != nil {
+		return 0, nil, err
+	}
 
-	   	for _, nsID := range nsIDs {
-	   		nsID = strings.TrimSuffix(nsID, "/")
-	   		//ns, err := NamespaceByID(ctx, nsID, b.Core)
-	   		//if err != nil {
-	   		//	return 0, nil, err
-	   		//}
+	// identify if the namespaces must be included in response and get counts
 
-	   		if b.includeNSInLockedUsersResponse(queryNS, ns) {
-	   			var displayPath string
-	   			if ns == nil {
-	   				// deleted namespace
-	   				displayPath = fmt.Sprintf("deleted namespace %q", nsID)
-	   			} else {
-	   				displayPath = ns.Path
-	   			}
+	for _, nsID := range nsIDs {
+		nsID = strings.TrimSuffix(nsID, "/")
+		ns := &namespace.Namespace{ID: nsID, Path: queryNS.Path}
+		//ns, err := NamespaceByID(ctx, nsID, b.Core)
+		//if err != nil {
+		//	return 0, nil, err
+		//}
 
-	   			// get mount accessors of locked users for this namespace
-	   			mountAccessors, err := b.Core.barrier.List(ctx, coreLockedUsersPath+nsID+"/")
-	   			if err != nil {
-	   				return 0, nil, err
-	   			}
+		if b.includeNSInLockedUsersResponse(queryNS, ns) {
+			var displayPath string
+			if ns == nil {
+				// deleted namespace
+				displayPath = fmt.Sprintf("deleted namespace %q", nsID)
+			} else {
+				displayPath = ns.Path
+			}
 
-	   			// get the locked user response for mount_accessor list
-	   			totalCountForNSID, mountAccessorsResponse, err := b.getMountAccessorsLockedUsers(ctx, mountAccessors, coreLockedUsersPath+nsID+"/")
-	   			if err != nil {
-	   				return 0, nil, err
-	   			}
+			// get mount accessors of locked users for this namespace
+			mountAccessors, err := b.Core.barrier.List(ctx, coreLockedUsersPath+nsID+"/")
+			if err != nil {
+				return 0, nil, err
+			}
 
-	   			totalCounts += totalCountForNSID
-	   			lockedUsersResponse = append(lockedUsersResponse, &LockedUsersResponse{
-	   				NamespaceID:    strings.TrimSuffix(nsID, "/"),
-	   				NamespacePath:  displayPath,
-	   				Counts:         totalCountForNSID,
-	   				MountAccessors: mountAccessorsResponse,
-	   			})
+			// get the locked user response for mount_accessor list
+			totalCountForNSID, mountAccessorsResponse, err := b.getMountAccessorsLockedUsers(ctx, mountAccessors, coreLockedUsersPath+nsID+"/")
+			if err != nil {
+				return 0, nil, err
+			}
 
-	   		}
-	   	}
+			totalCounts += totalCountForNSID
+			lockedUsersResponse = append(lockedUsersResponse, &LockedUsersResponse{
+				NamespaceID:    strings.TrimSuffix(nsID, "/"),
+				NamespacePath:  displayPath,
+				Counts:         totalCountForNSID,
+				MountAccessors: mountAccessorsResponse,
+			})
 
-	   // sort namespaces in response by decreasing order of counts
+		}
+	}
 
-	   	sort.Slice(lockedUsersResponse, func(i, j int) bool {
-	   		return lockedUsersResponse[i].Counts > lockedUsersResponse[j].Counts
-	   	})
+	// sort namespaces in response by decreasing order of counts
 
-	   return totalCounts, lockedUsersResponse, nil
-	*/
+	sort.Slice(lockedUsersResponse, func(i, j int) bool {
+		return lockedUsersResponse[i].Counts > lockedUsersResponse[j].Counts
+	})
+
+	return totalCounts, lockedUsersResponse, nil
 }
 
 // getMountAccessorsLockedUsers returns the locked users for all the mount_accessors of locked users for a namespace

@@ -818,22 +818,22 @@ func (ts *TokenStore) Invalidate(ctx context.Context, key string) {
 }
 
 func (ts *TokenStore) Salt(ctx context.Context) (*salt.Salt, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	ts.saltLock.RLock()
-	//if salt, ok := ts.salts[ns.ID]; ok {
-	//	defer ts.saltLock.RUnlock()
-	//	return salt, nil
-	//}
+	if salt, ok := ts.salts[ns.ID]; ok {
+		defer ts.saltLock.RUnlock()
+		return salt, nil
+	}
 	ts.saltLock.RUnlock()
 	ts.saltLock.Lock()
 	defer ts.saltLock.Unlock()
-	//if salt, ok := ts.salts[ns.ID]; ok {
-	//	return salt, nil
-	//}
+	if salt, ok := ts.salts[ns.ID]; ok {
+		return salt, nil
+	}
 
 	salt, err := salt.NewSalt(ctx, ts.baseView(nil), &salt.Config{
 		HashFunc: salt.SHA1Hash,
@@ -842,7 +842,7 @@ func (ts *TokenStore) Salt(ctx context.Context) (*salt.Salt, error) {
 	if err != nil {
 		return nil, err
 	}
-	// ts.salts[ns.ID] = salt
+	ts.salts[ns.ID] = salt
 	return salt, nil
 }
 
@@ -906,10 +906,10 @@ func (ts *TokenStore) SetExpirationManager(exp *ExpirationManager) {
 
 // SaltID is used to apply a salt and hash to an ID to make sure its not reversible
 func (ts *TokenStore) SaltID(ctx context.Context, id string) (string, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return "", namespace.ErrNoNamespace
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	s, err := ts.Salt(ctx)
 	if err != nil {
@@ -918,9 +918,9 @@ func (ts *TokenStore) SaltID(ctx context.Context, id string) (string, error) {
 
 	// For tokens of older format and belonging to the root namespace, use SHA1
 	// hash for salting.
-	//if ns.ID == namespace.RootNamespaceID && !strings.Contains(id, ".") {
-	//	return s.SaltID(id), nil
-	//}
+	if ns.ID == namespace.RootNamespaceID && !strings.Contains(id, ".") {
+		return s.SaltID(id), nil
+	}
 
 	// For all other tokens, use SHA2-256 HMAC for salting. This includes
 	// tokens of older format, but belonging to a namespace other than the root
@@ -946,13 +946,12 @@ func (ts *TokenStore) rootToken(ctx context.Context) (*logical.TokenEntry, error
 }
 
 func (ts *TokenStore) tokenStoreAccessorList(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//nsID := ns.ID
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	entries, err := ts.accessorView(nil).List(ctx, "")
+	entries, err := ts.accessorView(ns).List(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -975,8 +974,8 @@ func (ts *TokenStore) tokenStoreAccessorList(ctx context.Context, req *logical.R
 			continue
 		}
 
-		//if aEntry.NamespaceID == nsID {
-		//	ret = append(ret, aEntry.AccessorID)
+		//if aEntry.NamespaceID == ns.ID {
+		ret = append(ret, aEntry.AccessorID)
 		//}
 	}
 
@@ -999,16 +998,17 @@ func (ts *TokenStore) createAccessor(ctx context.Context, entry *logical.TokenEn
 	}
 
 	//tokenNS, err := NamespaceByID(ctx, entry.NamespaceID, ts.core)
-	//if err != nil {
-	//	return err
-	//}
-	//if tokenNS == nil {
-	//	return namespace.ErrNoNamespace
-	//}
+	tokenNS, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	if tokenNS == nil {
+		return namespace.ErrNoNamespace
+	}
 
-	//if tokenNS.ID != namespace.RootNamespaceID {
-	//	entry.Accessor = fmt.Sprintf("%s.%s", entry.Accessor, tokenNS.ID)
-	//}
+	if tokenNS.ID != namespace.RootNamespaceID {
+		entry.Accessor = fmt.Sprintf("%s.%s", entry.Accessor, tokenNS.ID)
+	}
 
 	// Create index entry, mapping the accessor to the token ID
 	// saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
@@ -1048,7 +1048,11 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 	//if tokenNS == nil {
 	//	return namespace.ErrNoNamespace
 	//}
-	var err error
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	tokenNSID := entry.NamespaceID
 
 	entry.Policies = policyutil.SanitizePolicies(entry.Policies, policyutil.DoNotAddDefaultPolicy)
 	var createRootTokenFlag bool
@@ -1108,16 +1112,20 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 		//if tokenNS.ID != namespace.RootNamespaceID {
 		//	entry.ID = fmt.Sprintf("%s.%s", entry.ID, tokenNS.ID)
 		//}
+		if tokenNSID != ns.ID {
+			entry.ID = fmt.Sprintf("%s.%s", entry.ID, tokenNSID)
+		}
 
 		//if tokenNS.ID != namespace.RootNamespaceID || strings.HasPrefix(entry.ID, consts.ServiceTokenPrefix) || strings.HasPrefix(entry.ID, consts.LegacyServiceTokenPrefix) {
-		//	if entry.CubbyholeID == "" {
-		//		cubbyholeID, err := base62.Random(TokenLength)
-		//		if err != nil {
-		//			return err
-		//	}
-		//		entry.CubbyholeID = cubbyholeID
-		//	}
-		//}
+		if tokenNSID != ns.ID || strings.HasPrefix(entry.ID, consts.ServiceTokenPrefix) || strings.HasPrefix(entry.ID, consts.LegacyServiceTokenPrefix) {
+			if entry.CubbyholeID == "" {
+				cubbyholeID, err := base62.Random(TokenLength)
+				if err != nil {
+					return err
+				}
+				entry.CubbyholeID = cubbyholeID
+			}
+		}
 
 		// If the user didn't specifically pick the ID, e.g. because they were
 		// sudo/root, check for collision; otherwise trust the process
@@ -1148,16 +1156,16 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 		// encrypt, skip persistence
 		entry.ID = ""
 		pEntry := &pb.TokenEntry{
-			Parent:       entry.Parent,
-			Policies:     entry.Policies,
-			Path:         entry.Path,
-			Meta:         entry.Meta,
-			DisplayName:  entry.DisplayName,
-			CreationTime: entry.CreationTime,
-			TTL:          int64(entry.TTL),
-			Role:         entry.Role,
-			EntityID:     entry.EntityID,
-			// NamespaceID:        entry.NamespaceID,
+			Parent:             entry.Parent,
+			Policies:           entry.Policies,
+			Path:               entry.Path,
+			Meta:               entry.Meta,
+			DisplayName:        entry.DisplayName,
+			CreationTime:       entry.CreationTime,
+			TTL:                int64(entry.TTL),
+			Role:               entry.Role,
+			EntityID:           entry.EntityID,
+			NamespaceID:        entry.NamespaceID,
 			Type:               uint32(entry.Type),
 			InternalMeta:       entry.InternalMeta,
 			InlinePolicy:       entry.InlinePolicy,
@@ -1206,9 +1214,9 @@ func (ts *TokenStore) create(ctx context.Context, entry *logical.TokenEntry) err
 			entry.ID = consts.BatchTokenPrefix + bEntry
 		}
 
-		//if tokenNS.ID != namespace.RootNamespaceID {
-		//	entry.ID = fmt.Sprintf("%s.%s", entry.ID, tokenNS.ID)
-		//}
+		if tokenNSID != namespace.RootNamespaceID {
+			entry.ID = fmt.Sprintf("%s.%s", entry.ID, tokenNSID)
+		}
 
 		return nil
 
@@ -1322,44 +1330,56 @@ func (ts *TokenStore) storeCommon(ctx context.Context, entry *logical.TokenEntry
 		// primary index because we'd rather have a dangling pointer with
 		// a missing primary instead of missing the parent index and potentially
 		// escaping the revocation chain.
-		/*
-			if entry.Parent != "" {
-				// Ensure the parent exists
-				parent, err := ts.Lookup(ctx, entry.Parent)
-				if err != nil {
-					return fmt.Errorf("failed to lookup parent: %w", err)
-				}
-				if parent == nil {
-					return fmt.Errorf("parent token not found")
-				}
-
-				parentNS, err := NamespaceByID(ctx, parent.NamespaceID, ts.core)
-				if err != nil {
-					return err
-				}
-				if parentNS == nil {
-					return namespace.ErrNoNamespace
-				}
-
-				parentCtx := namespace.ContextWithNamespace(ctx, parentNS)
-
-				// Create the index entry
-				parentSaltedID, err := ts.SaltID(parentCtx, entry.Parent)
-				if err != nil {
-					return err
-				}
-
-				path := parentSaltedID + "/" + saltedID
-				if tokenNS.ID != namespace.RootNamespaceID {
-					path = fmt.Sprintf("%s.%s", path, tokenNS.ID)
-				}
-
-				le := &logical.StorageEntry{Key: path}
-				if err := ts.parentView(parentNS).Put(ctx, le); err != nil {
-					return fmt.Errorf("failed to persist entry: %w", err)
-				}
+		if entry.Parent != "" {
+			// Ensure the parent exists
+			parent, err := ts.Lookup(ctx, entry.Parent)
+			if err != nil {
+				return fmt.Errorf("failed to lookup parent: %w", err)
 			}
-		*/
+			if parent == nil {
+				return fmt.Errorf("parent token not found")
+			}
+
+			ns, err := namespace.FromContext(ctx)
+			if err != nil {
+				return err
+			}
+			parentNS := ns
+			parentCtx := ctx
+			if parent.NamespaceID != ns.ID {
+				parentNS := &namespace.Namespace{ID: parent.NamespaceID}
+				parentCtx = namespace.ContextWithNamespace(ctx, parentNS)
+			}
+			//parentNS, err := NamespaceByID(ctx, parent.NamespaceID, ts.core)
+			//if err != nil {
+			//	return err
+			//}
+			//if parentNS == nil {
+			//	return namespace.ErrNoNamespace
+			//}
+			//parentCtx := namespace.ContextWithNamespace(ctx, parentNS)
+
+			// Create the index entry
+			parentSaltedID, err := ts.SaltID(parentCtx, entry.Parent)
+			if err != nil {
+				return err
+			}
+
+			//if tokenNS.ID != namespace.RootNamespaceID {
+			//	path = fmt.Sprintf("%s.%s", path, tokenNS.ID)
+			//}
+			var path string
+			if ns.ID == namespace.RootNamespaceID {
+				path = parentSaltedID + "/" + saltedID
+			} else {
+				path = fmt.Sprintf("%s.%s", path, ns.ID)
+			}
+
+			le := &logical.StorageEntry{Key: path}
+			if err := ts.parentView(parentNS).Put(ctx, le); err != nil {
+				return fmt.Errorf("failed to persist entry: %w", err)
+			}
+		}
 	}
 
 	// Write the primary ID
@@ -1591,7 +1611,6 @@ func (ts *TokenStore) lookupInternal(ctx context.Context, id string, salted, tai
 				ctx = namespace.ContextWithNamespace(ctx, ns)
 			}
 		*/
-
 		lookupID, err = ts.SaltID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -1619,9 +1638,9 @@ func (ts *TokenStore) lookupInternal(ctx context.Context, id string, salted, tai
 		return nil, nil
 	}
 
-	//if entry.NamespaceID == "" {
-	//	entry.NamespaceID = namespace.RootNamespaceID
-	//}
+	if entry.NamespaceID == "" {
+		entry.NamespaceID = namespace.RootNamespaceID
+	}
 
 	// This will be the upgrade case
 	if entry.Type == logical.TokenTypeDefault {
@@ -1976,94 +1995,88 @@ func (ts *TokenStore) revokeTree(ctx context.Context, le *leaseEntry) error {
 // child tokens.
 // Updated to be non-recursive and revoke child tokens
 // before parent tokens(DFS).
-func (ts *TokenStore) revokeTreeInternal(_ context.Context, _ string) error {
-	/*
-		dfs := []string{id}
-		seenIDs := make(map[string]struct{})
+func (ts *TokenStore) revokeTreeInternal(ctx context.Context, id string) error {
+	dfs := []string{id}
+	seenIDs := make(map[string]struct{})
 
-		var ns *namespace.Namespace
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
-		te, err := ts.lookupInternal(ctx, id, true, true)
+	te, err := ts.lookupInternal(ctx, id, true, true)
+	if err != nil {
+		return err
+	}
+	if te != nil {
+		ns.ID = te.NamespaceID
+	}
+
+	for l := len(dfs); l > 0; l = len(dfs) {
+		id := dfs[len(dfs)-1]
+		seenIDs[id] = struct{}{}
+
+		saltedCtx := ctx
+		saltedNS := ns
+		saltedID, saltedNSID := namespace.SplitIDFromString(id)
+		//if saltedNSID != "" {
+		if saltedNSID != "" && saltedNSID != ns.ID {
+			//saltedNS, err = NamespaceByID(ctx, saltedNSID, ts.core)
+			//if err != nil {
+			//	return fmt.Errorf("failed to find namespace for token revocation: %w", err)
+			//}
+			//if saltedNS == nil {
+			//	return errors.New("failed to find namespace for token revocation")
+			//}
+
+			//saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
+			saltedNS = &namespace.Namespace{ID: saltedNSID, Path: ns.Path}
+			saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
+		}
+
+		path := saltedID + "/"
+		childrenRaw, err := ts.parentView(saltedNS).List(saltedCtx, path)
 		if err != nil {
-			return err
-		}
-		if te == nil {
-			ns, err = namespace.FromContext(ctx)
-			if err != nil {
-				return err
-			}
-		} else {
-			ns, err = NamespaceByID(ctx, te.NamespaceID, ts.core)
-			if err != nil {
-				return err
-			}
-		}
-		if ns == nil {
-			return fmt.Errorf("failed to find namespace for token revocation")
+			return fmt.Errorf("failed to scan for children: %w", err)
 		}
 
-		for l := len(dfs); l > 0; l = len(dfs) {
-			id := dfs[len(dfs)-1]
-			seenIDs[id] = struct{}{}
-
-			saltedCtx := ctx
-			saltedNS := ns
-			saltedID, saltedNSID := namespace.SplitIDFromString(id)
-			if saltedNSID != "" {
-				saltedNS, err = NamespaceByID(ctx, saltedNSID, ts.core)
-				if err != nil {
-					return fmt.Errorf("failed to find namespace for token revocation: %w", err)
-				}
-				if saltedNS == nil {
-					return errors.New("failed to find namespace for token revocation")
-				}
-
-				saltedCtx = namespace.ContextWithNamespace(ctx, saltedNS)
-			}
-
-			path := saltedID + "/"
-			childrenRaw, err := ts.parentView(saltedNS).List(saltedCtx, path)
-			if err != nil {
-				return fmt.Errorf("failed to scan for children: %w", err)
-			}
-
-			// Filter the child list to remove any items that have ever been in the dfs stack.
-			// This is a robustness check, as a parent/child cycle can lead to an OOM crash.
-			children := make([]string, 0, len(childrenRaw))
-			for _, child := range childrenRaw {
-				if _, seen := seenIDs[child]; !seen {
-					children = append(children, child)
-				} else {
-					if err = ts.parentView(saltedNS).Delete(saltedCtx, path+child); err != nil {
-						return fmt.Errorf("failed to delete entry: %w", err)
-					}
-
-					ts.Logger().Warn("token cycle found", "token", child)
-				}
-			}
-
-			// If the length of the children array is zero,
-			// then we are at a leaf node.
-			if len(children) == 0 {
-				// Whenever revokeInternal is called, the token will be removed immediately and
-				// any underlying secrets will be handed off to the expiration manager which will
-				// take care of expiring them. If Vault is restarted, any revoked tokens
-				// would have been deleted, and any pending leases for deletion will be restored
-				// by the expiration manager.
-				if err := ts.revokeInternal(saltedCtx, saltedID, true); err != nil {
-					return fmt.Errorf("failed to revoke entry: %w", err)
-				}
-				// If the length of l is equal to 1, then the last token has been deleted
-				if l == 1 {
-					return nil
-				}
-				dfs = dfs[:len(dfs)-1]
+		// Filter the child list to remove any items that have ever been in the dfs stack.
+		// This is a robustness check, as a parent/child cycle can lead to an OOM crash.
+		children := make([]string, 0, len(childrenRaw))
+		for _, child := range childrenRaw {
+			if _, seen := seenIDs[child]; !seen {
+				children = append(children, child)
 			} else {
-				// If we make it here, there are children and they must be appended.
-				dfs = append(dfs, children...)
+				if err = ts.parentView(saltedNS).Delete(saltedCtx, path+child); err != nil {
+					return fmt.Errorf("failed to delete entry: %w", err)
+				}
+
+				ts.Logger().Warn("token cycle found", "token", child)
 			}
 		}
-	*/
+
+		// If the length of the children array is zero,
+		// then we are at a leaf node.
+		if len(children) == 0 {
+			// Whenever revokeInternal is called, the token will be removed immediately and
+			// any underlying secrets will be handed off to the expiration manager which will
+			// take care of expiring them. If Vault is restarted, any revoked tokens
+			// would have been deleted, and any pending leases for deletion will be restored
+			// by the expiration manager.
+			if err := ts.revokeInternal(saltedCtx, saltedID, true); err != nil {
+				return fmt.Errorf("failed to revoke entry: %w", err)
+			}
+			// If the length of l is equal to 1, then the last token has been deleted
+			if l == 1 {
+				return nil
+			}
+			dfs = dfs[:len(dfs)-1]
+		} else {
+			// If we make it here, there are children and they must be appended.
+			dfs = append(dfs, children...)
+		}
+	}
+
 	return nil
 }
 
@@ -2084,35 +2097,36 @@ func (ts *TokenStore) handleCreateAgainstRole(ctx context.Context, req *logical.
 func (ts *TokenStore) lookupByAccessor(ctx context.Context, id string, salted, tainted bool) (*accessorEntry, error) {
 	var aEntry accessorEntry
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
-	var err error
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	lookupID := id
 	if !salted {
-		/*
-			_, nsID := namespace.SplitIDFromString(id)
-			if nsID != "" {
-				accessorNS, err := NamespaceByID(ctx, nsID, ts.core)
-				if err != nil {
-					return nil, err
-				}
-				if accessorNS != nil {
-					if accessorNS.ID != ns.ID {
-						ns = accessorNS
-						ctx = namespace.ContextWithNamespace(ctx, accessorNS)
-					}
-				}
-			} else {
-				// Any non-root-ns token should have an accessor and child
-				// namespaces cannot have custom IDs. If someone omits or tampers
-				// with it, the lookup in the root namespace simply won't work.
-				ns = namespace.RootNamespace
-				ctx = namespace.ContextWithNamespace(ctx, ns)
-			}
-		*/
+		_, nsID := namespace.SplitIDFromString(id)
+		//if nsID != "" {
+		//	accessorNS, err := NamespaceByID(ctx, nsID, ts.core)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	if accessorNS != nil {
+		//		if accessorNS.ID != ns.ID {
+		//			ns = accessorNS
+		//			ctx = namespace.ContextWithNamespace(ctx, accessorNS)
+		//		}
+		//	}
+		if nsID != "" && nsID != ns.ID {
+			ns = &namespace.Namespace{ID: nsID, Path: ns.Path}
+			ctx = namespace.ContextWithNamespace(ctx, ns)
+		} else {
+			// Any non-root-ns token should have an accessor and child
+			// namespaces cannot have custom IDs. If someone omits or tampers
+			// with it, the lookup in the root namespace simply won't work.
+			ns = namespace.RootNamespace
+			ctx = namespace.ContextWithNamespace(ctx, ns)
+		}
+
 		lookupID, err = ts.SaltID(ctx, id)
 		if err != nil {
 			return nil, err
@@ -2599,6 +2613,7 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 	if err != nil {
 		return nil, fmt.Errorf("parent token lookup failed: %w", err)
 	}
+
 	if parent == nil {
 		return logical.ErrorResponse("parent token lookup failed: no parent found"), logical.ErrInvalidRequest
 	}
@@ -2621,10 +2636,10 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 	// If the context's namespace is different from the parent and this is an
 	// orphan token creation request, then this is an admin token generation for
 	// the namespace
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	/*
 		if ns.ID != parent.NamespaceID {
 			parentNS, err := NamespaceByID(ctx, parent.NamespaceID, ts.core)
@@ -2785,8 +2800,8 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 		DisplayName:  "token",
 		NumUses:      numUses,
 		CreationTime: time.Now().Unix(),
-		// NamespaceID:  ns.ID,
-		Type: tokenType,
+		NamespaceID:  ns.ID,
+		Type:         tokenType,
 	}
 
 	// If the role is not nil, we add the role name as part of the token's
@@ -2832,10 +2847,10 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 			return logical.ErrorResponse("root or sudo privileges required to specify token id"),
 				logical.ErrInvalidRequest
 		}
-		//if ns.ID != namespace.RootNamespaceID {
-		//	return logical.ErrorResponse("token IDs can only be manually specified in the root namespace"),
-		//		logical.ErrInvalidRequest
-		//}
+		if ns.ID != namespace.RootNamespaceID {
+			return logical.ErrorResponse("token IDs can only be manually specified in the root namespace"),
+				logical.ErrInvalidRequest
+		}
 		te.ID = id
 	}
 
@@ -2922,8 +2937,8 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 
 	// We are creating a token from a parent namespace. We should only use the input
 	// policies.
-	// case ns.ID != parent.NamespaceID:
-	//	addDefault = !noDefaultPolicy
+	case ns.ID != parent.NamespaceID:
+		addDefault = !noDefaultPolicy
 
 	// No policies specified, inherit parent
 	case len(policies) == 0:
@@ -3157,13 +3172,12 @@ func (ts *TokenStore) handleCreateCommon(ctx context.Context, req *logical.Reque
 
 	// Count the successful token creation.
 	ttl_label := metricsutil.TTLBucket(te.TTL)
-	// mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
-	mountPointWithoutNs := req.MountPoint
+	mountPointWithoutNs := ns.TrimmedPath(req.MountPoint)
 	ts.core.metricSink.IncrCounterWithLabels(
 		[]string{"token", "creation"},
 		1,
 		[]metrics.Label{
-			// metricsutil.NamespaceLabel(ns),
+			metricsutil.NamespaceLabel(ns),
 			{Name: "auth_method", Value: "token"},
 			{Name: "mount_point", Value: mountPointWithoutNs}, // path, not accessor
 			{Name: "creation_ttl", Value: ttl_label},
@@ -3487,12 +3501,12 @@ func (ts *TokenStore) authRenew(ctx context.Context, req *logical.Request, d *fr
 }
 
 func (ts *TokenStore) tokenStoreRole(ctx context.Context, name string) (*tsRoleEntry, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	entry, err := ts.rolesView(nil).Get(ctx, name)
+	entry, err := ts.rolesView(ns).Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -3525,12 +3539,12 @@ func (ts *TokenStore) tokenStoreRole(ctx context.Context, name string) (*tsRoleE
 }
 
 func (ts *TokenStore) tokenStoreRoleList(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	entries, err := ts.rolesView(nil).List(ctx, "")
+	entries, err := ts.rolesView(ns).List(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -3544,12 +3558,12 @@ func (ts *TokenStore) tokenStoreRoleList(ctx context.Context, req *logical.Reque
 }
 
 func (ts *TokenStore) tokenStoreRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	err := ts.rolesView(nil).Delete(ctx, data.Get("role_name").(string))
+	err = ts.rolesView(ns).Delete(ctx, data.Get("role_name").(string))
 	if err != nil {
 		return nil, err
 	}
@@ -3841,17 +3855,17 @@ func (ts *TokenStore) tokenStoreRoleCreateUpdate(ctx context.Context, req *logic
 		entry.AllowedEntityAliases = strutil.RemoveDuplicates(allowedEntityAliasesRaw.([]string), true)
 	}
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// Store it
 	jsonEntry, err := logical.StorageEntryJSON(name, entry)
 	if err != nil {
 		return nil, err
 	}
-	if err := ts.rolesView(nil).Put(ctx, jsonEntry); err != nil {
+	if err := ts.rolesView(ns).Put(ctx, jsonEntry); err != nil {
 		return nil, err
 	}
 

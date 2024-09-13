@@ -493,7 +493,10 @@ func (c *Core) CheckToken(ctx context.Context, req *logical.Request, unauth bool
 
 // HandleRequest is used to handle a new incoming request
 func (c *Core) HandleRequest(httpCtx context.Context, req *logical.Request) (resp *logical.Response, err error) {
-	return c.switchedLockHandleRequest(httpCtx, req, true)
+	c.Logger().Trace("Core HandleRequest start")
+	resp, err = c.switchedLockHandleRequest(httpCtx, req, true)
+	c.Logger().Trace("Core HandleRequest end", "error", err)
+	return resp, err
 }
 
 func (c *Core) switchedLockHandleRequest(httpCtx context.Context, req *logical.Request, doLocking bool) (resp *logical.Response, err error) {

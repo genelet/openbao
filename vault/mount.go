@@ -253,16 +253,16 @@ func (t *MountTable) setTaint(path string, tainted bool, mountState string) (*Mo
 
 // remove is used to remove a given path entry; returns the entry that was
 // removed
-func (t *MountTable) remove(_ context.Context, path string) (*MountEntry, error) {
+func (t *MountTable) remove(ctx context.Context, path string) (*MountEntry, error) {
 	n := len(t.Entries)
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := 0; i < n; i++ {
-		// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
-		if entry := t.Entries[i]; entry.Path == path {
+		if entry := t.Entries[i]; entry.Path == path && entry.NamespaceID == ns.ID {
+			//if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
 			t.Entries[i], t.Entries[n-1] = t.Entries[n-1], nil
 			t.Entries = t.Entries[:n-1]
 			return entry, nil
@@ -271,32 +271,32 @@ func (t *MountTable) remove(_ context.Context, path string) (*MountEntry, error)
 	return nil, nil
 }
 
-func (t *MountTable) find(_ context.Context, path string) (*MountEntry, error) {
+func (t *MountTable) find(ctx context.Context, path string) (*MountEntry, error) {
 	n := len(t.Entries)
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := 0; i < n; i++ {
 		// if entry := t.Entries[i]; entry.Path == path && entry.Namespace().ID == ns.ID {
-		if entry := t.Entries[i]; entry.Path == path {
+		if entry := t.Entries[i]; entry.Path == path && entry.NamespaceID == ns.ID {
 			return entry, nil
 		}
 	}
 	return nil, nil
 }
 
-func (t *MountTable) findByBackendUUID(_ context.Context, backendUUID string) (*MountEntry, error) {
+func (t *MountTable) findByBackendUUID(ctx context.Context, backendUUID string) (*MountEntry, error) {
 	n := len(t.Entries)
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := 0; i < n; i++ {
 		// if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID && entry.Namespace().ID == ns.ID {
-		if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID {
+		if entry := t.Entries[i]; entry.BackendAwareUUID == backendUUID && entry.NamespaceID == ns.ID {
 			return entry, nil
 		}
 	}
@@ -340,7 +340,7 @@ type MountEntry struct {
 	ExternalEntropyAccess bool              `json:"external_entropy_access,omitempty"` // Whether to allow external entropy source access
 	Tainted               bool              `json:"tainted,omitempty"`                 // Set as a Write-Ahead flag for unmount/remount
 	MountState            string            `json:"mount_state,omitempty"`             // The current mount state.  The only non-empty mount state right now is "unmounting"
-	// NamespaceID           string            `json:"namespace_id"`
+	NamespaceID           string            `json:"namespace_id"`
 
 	// namespace contains the populated namespace
 	// namespace *namespace.Namespace
@@ -512,7 +512,7 @@ func (e *MountEntry) SyncCache() {
 func (entry *MountEntry) Deserialize() map[string]interface{} {
 	return map[string]interface{}{
 		"mount_path": entry.Path,
-		//	"mount_namespace": entry.Namespace().Path,
+		//"mount_namespace": entry.Namespace().Path,
 		"uuid":       entry.UUID,
 		"accessor":   entry.Accessor,
 		"mount_type": entry.Type,
@@ -524,7 +524,7 @@ func (c *Core) DecodeMountTable(ctx context.Context, raw []byte) (*MountTable, e
 	return c.decodeMountTable(ctx, raw)
 }
 
-func (c *Core) decodeMountTable(_ context.Context, raw []byte) (*MountTable, error) {
+func (c *Core) decodeMountTable(ctx context.Context, raw []byte) (*MountTable, error) {
 	// Decode into mount table
 	mountTable := new(MountTable)
 	if err := jsonutil.DecodeJSON(raw, mountTable); err != nil {
@@ -534,21 +534,19 @@ func (c *Core) decodeMountTable(_ context.Context, raw []byte) (*MountTable, err
 	// Populate the namespace in memory
 	var mountEntries []*MountEntry
 	for _, entry := range mountTable.Entries {
-		/*
-			if entry.NamespaceID == "" {
-				entry.NamespaceID = namespace.RootNamespaceID
-			}
-			ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
-			if err != nil {
-				return nil, err
-			}
-			if ns == nil {
-				c.logger.Error("namespace on mount entry not found", "namespace_id", entry.NamespaceID, "mount_path", entry.Path, "mount_description", entry.Description)
-				continue
-			}
+		if entry.NamespaceID == "" {
+			entry.NamespaceID = namespace.RootNamespaceID
+		}
+		//ns, err := NamespaceByID(ctx, entry.NamespaceID, c)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//if ns == nil {
+		//	c.logger.Error("namespace on mount entry not found", "namespace_id", entry.NamespaceID, "mount_path", entry.Path, "mount_description", entry.Description)
+		//	continue
+		//}
 
-			entry.namespace = ns
-		*/
+		//entry.namespace = ns
 		mountEntries = append(mountEntries, entry)
 	}
 
@@ -601,33 +599,30 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	}
 	defer unlock()
 	var err error
-	/*
-		ns, err := namespace.FromContext(ctx)
-		if err != nil {
-			return err
-		}
 
-		entry.NamespaceID = ns.ID
-		entry.namespace = ns
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
-		// Ensure the cache is populated, don't need the result
-		NamespaceByID(ctx, ns.ID, c)
-	*/
+	entry.NamespaceID = ns.ID
+	//entry.namespace = ns
+
+	// Ensure the cache is populated, don't need the result
+	//NamespaceByID(ctx, ns.ID, c)
+
 	// Basic check for matching names
 	for _, ent := range c.mounts.Entries {
-		// oss start
-		// c.logger.Trace("mountInternal 001", "namespace_id", ns.ID, "namespace_path", ns.Path, "ent_namespace_id", ent.NamespaceID, "ent_namespace_path", ent.namespace.Path, "ent_path", ent.Path, "entry_path", entry.Path)
-		// oss end
-		//	if ns.ID == ent.NamespaceID {
-		switch {
-		// Existing is oauth/github/ new is oauth/ or
-		// existing is oauth/ and new is oauth/github/
-		case strings.HasPrefix(ent.Path, entry.Path):
-			fallthrough
-		case strings.HasPrefix(entry.Path, ent.Path):
-			return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
+		if ns.ID == ent.NamespaceID {
+			switch {
+			// Existing is oauth/github/ new is oauth/ or
+			// existing is oauth/ and new is oauth/github/
+			case strings.HasPrefix(ent.Path, entry.Path):
+				fallthrough
+			case strings.HasPrefix(entry.Path, ent.Path):
+				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
+			}
 		}
-		//	}
 	}
 
 	// Verify there are no conflicting mounts in the router
@@ -798,10 +793,10 @@ func (c *Core) unmount(ctx context.Context, path string) error {
 }
 
 func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage bool) error {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Verify exact match of the route
 	match := c.router.MatchingMount(ctx, path)
@@ -858,8 +853,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 		// Don't attempt to clear data, replication will handle this
 	default:
 		// Have writable storage, remove the whole thing
-		// if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", ns.ID, "path", path)); err != nil {
-		if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", namespace.RootNamespace, "path", path)); err != nil {
+		if err := logical.ClearViewWithLogging(ctx, view, c.logger.Named("secrets.deletion").With("namespace", ns.ID, "path", path)); err != nil {
 			c.logger.Error("failed to clear view for path being unmounted", "error", err, "path", path)
 			return err
 		}
@@ -877,8 +871,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 	}
 
 	if c.quotaManager != nil {
-		// if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
-		if err := c.quotaManager.HandleBackendDisabling(ctx, path); err != nil {
+		if err := c.quotaManager.HandleBackendDisabling(ctx, ns.Path, path); err != nil {
 			c.logger.Error("failed to update quotas after disabling mount", "path", path, "error", err)
 			return err
 		}
@@ -1295,11 +1288,10 @@ func (c *Core) runMountUpdates(ctx context.Context, needPersist bool) error {
 			needPersist = true
 		}
 
-		// if entry.NamespaceID == "" {
-		//	entry.NamespaceID = namespace.RootNamespaceID
-		// OSS Oneline, do we need it?
-		needPersist = true
-		//}
+		if entry.NamespaceID == "" {
+			entry.NamespaceID = namespace.RootNamespaceID
+			needPersist = true
+		}
 
 		// Don't store built-in version in the mount table, to make upgrades smoother.
 		if versions.IsBuiltinVersion(entry.Version) {

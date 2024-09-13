@@ -657,7 +657,6 @@ func (ps *PolicyStore) ACL(ctx context.Context, entity *identity.Entity, policyN
 			if !fetchedGroups {
 				fetchedGroups = true
 				if entity != nil {
-					ps.logger.Trace("fetching groups for entity 80000", "entity", entity.ID)
 					directGroups, inheritedGroups, err := ps.core.identityStore.groupsByEntityID(entity.ID)
 					if err != nil {
 						return nil, fmt.Errorf("failed to fetch group memberships: %w", err)

@@ -10,8 +10,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// func (m *ExpirationManager) leaseView(*namespace.Namespace) *BarrierView {
-func (m *ExpirationManager) leaseView() *BarrierView {
+func (m *ExpirationManager) leaseView(*namespace.Namespace) *BarrierView {
 	return m.idView
 }
 
@@ -22,7 +21,7 @@ func (m *ExpirationManager) tokenIndexView(*namespace.Namespace) *BarrierView {
 func (m *ExpirationManager) collectLeases() (map[*namespace.Namespace][]string, int, error) {
 	leaseCount := 0
 	existing := make(map[*namespace.Namespace][]string)
-	keys, err := logical.CollectKeys(m.quitContext, m.leaseView())
+	keys, err := logical.CollectKeys(m.quitContext, m.leaseView(nil))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to scan for leases: %w", err)
 	}

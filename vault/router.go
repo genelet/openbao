@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 
-	//"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/salt"
@@ -565,10 +564,10 @@ func (r *Router) RouteExistenceCheck(ctx context.Context, req *logical.Request) 
 }
 
 func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenceCheck bool) (*logical.Response, bool, bool, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, false, false, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, false, false, err
+	}
 
 	// Find the mount point
 	r.l.RLock()
@@ -588,10 +587,8 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 	}
 	r.l.RUnlock()
 	if !ok {
-		r.logger.Trace("Router routeCommon 003 error", "ns.path", adjustedPath, "mount", mount, "ok", ok)
 		return logical.ErrorResponse(fmt.Sprintf("no handler for route %q. route entry not found.", req.Path)), false, false, logical.ErrUnsupportedPath
 	}
-	r.logger.Trace("Router routeCommon 004", "ns.path", adjustedPath, "mount", mount, "ok", ok)
 	req.Path = adjustedPath
 	if !existenceCheck {
 		defer metrics.MeasureSince([]string{
@@ -788,11 +785,9 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 		ok, exists, err := re.backend.HandleExistenceCheck(ctx, req)
 		return nil, ok, exists, err
 	} else {
-		r.logger.Trace("Router routeCommon 005", "backend", fmt.Sprintf("%T", re.backend), "req", fmt.Sprintf("%T", req))
-		if v, ok := re.backend.(*SystemBackend); ok {
-			r.logger.Trace("Router routeCommon 005.1", "backend", fmt.Sprintf("%T", v.Backend))
-		}
+		r.logger.Trace("Route Common start", "path", req.Path, "operation", req.Operation, "client_token", req.ClientToken, "mount", req.MountPoint, "namespace", ns)
 		resp, err := re.backend.HandleRequest(ctx, req)
+		r.logger.Debug("Route Common end", "resp", resp)
 		if resp != nil {
 			if len(allowedResponseHeaders) > 0 {
 				resp.Headers = filteredHeaders(resp.Headers, allowedResponseHeaders, nil)
@@ -848,7 +843,6 @@ func (r *Router) routeCommon(ctx context.Context, req *logical.Request, existenc
 			}
 		}
 
-		r.logger.Trace("Router routeCommon 006", "response", fmt.Sprintf("%T", resp), "err", err)
 		return resp, false, false, err
 	}
 }

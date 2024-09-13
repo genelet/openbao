@@ -161,15 +161,14 @@ type ExpireLeaseStrategy func(context.Context, *ExpirationManager, string, *name
 
 // revocationJob should only be created through newRevocationJob()
 type revocationJob struct {
-	leaseID string
-	// ns        *namespace.Namespace
+	leaseID   string
+	ns        *namespace.Namespace
 	m         *ExpirationManager
 	nsCtx     context.Context
 	startTime time.Time
 }
 
-// func newRevocationJob(nsCtx context.Context, leaseID string, ns *namespace.Namespace, m *ExpirationManager) (*revocationJob, error) {
-func newRevocationJob(nsCtx context.Context, leaseID string, m *ExpirationManager) (*revocationJob, error) {
+func newRevocationJob(nsCtx context.Context, leaseID string, ns *namespace.Namespace, m *ExpirationManager) (*revocationJob, error) {
 	if leaseID == "" {
 		return nil, fmt.Errorf("cannot have empty lease id")
 	}
@@ -181,8 +180,8 @@ func newRevocationJob(nsCtx context.Context, leaseID string, m *ExpirationManage
 	}
 
 	return &revocationJob{
-		leaseID: leaseID,
-		// ns:        ns,
+		leaseID:   leaseID,
+		ns:        ns,
 		m:         m,
 		nsCtx:     nsCtx,
 		startTime: time.Now(),
@@ -239,8 +238,7 @@ func (r *revocationJob) Execute() error {
 }
 
 func (r *revocationJob) OnFailure(err error) {
-	// r.m.core.metricSink.IncrCounterWithLabels([]string{"expire", "lease_expiration", "error"}, 1, []metrics.Label{metricsutil.NamespaceLabel(r.ns)})
-	r.m.core.metricSink.IncrCounterWithLabels([]string{"expire", "lease_expiration", "error"}, 1, []metrics.Label{})
+	r.m.core.metricSink.IncrCounterWithLabels([]string{"expire", "lease_expiration", "error"}, 1, []metrics.Label{metricsutil.NamespaceLabel(r.ns)})
 
 	r.m.pendingLock.Lock()
 	pendingRaw, ok := r.m.pending.Load(r.leaseID)
@@ -288,12 +286,11 @@ func (r *revocationJob) OnFailure(err error) {
 }
 
 func expireLeaseStrategyFairsharing(ctx context.Context, m *ExpirationManager, leaseID string, ns *namespace.Namespace) {
-	nsCtx := namespace.ContextWithNamespace(ctx, ns)
-
+	//nsCtx := namespace.ContextWithNamespace(ctx, ns)
+	nsCtx := ctx
 	mountAccessor := m.getLeaseMountAccessorLocked(ctx, leaseID)
 
-	// job, err := newRevocationJob(nsCtx, leaseID, ns, m)
-	job, err := newRevocationJob(nsCtx, leaseID, m)
+	job, err := newRevocationJob(nsCtx, leaseID, ns, m)
 	if err != nil {
 		m.logger.Warn("error creating revocation job", "error", err)
 		return
@@ -642,7 +639,7 @@ func (m *ExpirationManager) Tidy(ctx context.Context) error {
 	//if err != nil {
 	//	return err
 	//}
-	leaseView := m.leaseView()
+	leaseView := m.leaseView(nil)
 	if err := logical.ScanView(m.quitContext, leaseView, tidyFunc); err != nil {
 		return err
 	}
@@ -934,15 +931,15 @@ func (m *ExpirationManager) attemptIrrevocableLeasesRevoke() {
 		if le.ExpireTime.Add(time.Hour).Before(time.Now()) {
 			// if we get an error (or no namespace) note it, but continue attempting
 			// to revoke other leases
-			//leaseNS, err := m.getNamespaceFromLeaseID(m.core.activeContext, leaseID)
-			//if err != nil {
-			//	m.logger.Debug("could not get lease namespace from ID", "error", err)
-			//	return true
-			//}
-			//if leaseNS == nil {
-			//	m.logger.Debug("could not get lease namespace from ID: nil namespace")
-			//	return true
-			//}
+			leaseNS, err := m.getNamespaceFromLeaseID(m.core.activeContext, leaseID)
+			if err != nil {
+				m.logger.Debug("could not get lease namespace from ID", "error", err)
+				return true
+			}
+			if leaseNS == nil {
+				m.logger.Debug("could not get lease namespace from ID: nil namespace")
+				return true
+			}
 
 			// ctxWithNS := namespace.ContextWithNamespace(m.core.activeContext, leaseNS)
 			ctxWithNS := m.core.activeContext
@@ -1050,6 +1047,7 @@ func (m *ExpirationManager) revokeCommon(ctx context.Context, leaseID string, fo
 		}
 		m.logger.Warn("finished revoking incorrectly non-expiring lease", "leaseID", le.LeaseID, "accessor", accessor)
 	}
+
 	return nil
 }
 
@@ -1114,6 +1112,9 @@ func (m *ExpirationManager) RevokeByToken(ctx context.Context, te *logical.Token
 		//if tokenNS.ID != namespace.RootNamespaceID {
 		//tokenLeaseID = fmt.Sprintf("%s.%s", tokenLeaseID, tokenNS.ID)
 		//}
+		if te.NamespaceID != "" && te.NamespaceID != namespace.RootNamespaceID {
+			tokenLeaseID = fmt.Sprintf("%s.%s", tokenLeaseID, te.NamespaceID)
+		}
 
 		// We want to skip the revokeEntry call as that will call back into
 		// revocation logic in the token store, which is what is running this
@@ -1160,7 +1161,7 @@ func (m *ExpirationManager) revokePrefixCommon(ctx context.Context, prefix strin
 	//	return err
 	//}
 	//view := m.leaseView(ns)
-	view := m.leaseView()
+	view := m.leaseView(nil)
 	sub := view.SubView(prefix)
 	existing, err := logical.CollectKeys(ctx, sub)
 	if err != nil {
@@ -1446,16 +1447,16 @@ func (m *ExpirationManager) Register(ctx context.Context, req *logical.Request, 
 		return "", err
 	}
 
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return "", err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	leaseID := path.Join(req.Path, leaseRand)
 
-	//if ns.ID != namespace.RootNamespaceID {
-	//leaseID = fmt.Sprintf("%s.%s", leaseID, ns.ID)
-	//}
+	if ns.ID != namespace.RootNamespaceID {
+		leaseID = fmt.Sprintf("%s.%s", leaseID, ns.ID)
+	}
 
 	le := &leaseEntry{
 		LeaseID:         leaseID,
@@ -1467,8 +1468,8 @@ func (m *ExpirationManager) Register(ctx context.Context, req *logical.Request, 
 		LoginRole:       loginRole,
 		IssueTime:       time.Now(),
 		ExpireTime:      resp.Secret.ExpirationTime(),
-		// namespace:       ns,
-		Version: 1,
+		namespace:       ns,
+		Version:         1,
 	}
 
 	var indexToken string
@@ -1593,6 +1594,10 @@ func (m *ExpirationManager) RegisterAuth(ctx context.Context, te *logical.TokenE
 	//if tokenNS == nil {
 	//	return namespace.ErrNoNamespace
 	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	// saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
 	saltCtx := ctx
@@ -1615,8 +1620,9 @@ func (m *ExpirationManager) RegisterAuth(ctx context.Context, te *logical.TokenE
 		LoginRole:   loginRole,
 		IssueTime:   time.Now(),
 		ExpireTime:  authExpirationTime,
-		// namespace:   tokenNS,
-		Version: 1,
+		//namespace:   tokenNS,
+		namespace: ns,
+		Version:   1,
 	}
 
 	leaseLock := m.lockForLeaseID(leaseID)
@@ -1679,6 +1685,9 @@ func (m *ExpirationManager) FetchLeaseTimesByToken(ctx context.Context, te *logi
 	//if tokenNS.ID != namespace.RootNamespaceID {
 	//	leaseID = fmt.Sprintf("%s.%s", leaseID, tokenNS.ID)
 	//}
+	if te.NamespaceID != "" && te.NamespaceID != namespace.RootNamespaceID {
+		leaseID = fmt.Sprintf("%s.%s", leaseID, te.NamespaceID)
+	}
 
 	return m.FetchLeaseTimes(ctx, leaseID)
 }
@@ -1922,6 +1931,7 @@ func (m *ExpirationManager) revokeEntry(ctx context.Context, le *leaseEntry) err
 	if err != nil || (resp != nil && resp.IsError()) {
 		return fmt.Errorf("failed to revoke entry: resp: %#v err: %w", resp, err)
 	}
+
 	return nil
 }
 
@@ -2014,12 +2024,12 @@ func (m *ExpirationManager) loadEntry(ctx context.Context, leaseID string) (*lea
 // loadEntryInternal is used when you need to load an entry but also need to
 // control the lifecycle of the restoreLock
 func (m *ExpirationManager) loadEntryInternal(ctx context.Context, leaseID string, restoreMode bool, checkRestored bool) (*leaseEntry, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	view := m.leaseView()
+	view := m.leaseView(nil)
 	out, err := view.Get(ctx, leaseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read lease entry %s: %w", leaseID, err)
@@ -2031,7 +2041,7 @@ func (m *ExpirationManager) loadEntryInternal(ctx context.Context, leaseID strin
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode lease entry %s: %w", leaseID, err)
 	}
-	// le.namespace = ns
+	le.namespace = ns
 
 	if restoreMode {
 		if checkRestored {
@@ -2070,7 +2080,7 @@ func (m *ExpirationManager) persistEntry(ctx context.Context, le *leaseEntry) er
 		ent.SealWrap = true
 	}
 
-	view := m.leaseView()
+	view := m.leaseView(nil)
 	if err := view.Put(ctx, &ent); err != nil {
 		return fmt.Errorf("failed to persist lease entry: %w", err)
 	}
@@ -2079,7 +2089,7 @@ func (m *ExpirationManager) persistEntry(ctx context.Context, le *leaseEntry) er
 
 // deleteEntry is used to delete a lease entry
 func (m *ExpirationManager) deleteEntry(ctx context.Context, le *leaseEntry) error {
-	view := m.leaseView()
+	view := m.leaseView(nil)
 	if err := view.Delete(ctx, le.LeaseID); err != nil {
 		return fmt.Errorf("failed to delete lease entry: %w", err)
 	}
@@ -2102,16 +2112,14 @@ func (m *ExpirationManager) createIndexByToken(ctx context.Context, le *leaseEnt
 				saltCtx = namespace.ContextWithNamespace(ctx, tokenNS)
 			}
 		}
-
-		saltedID, err := m.tokenStore.SaltID(saltCtx, token)
 	*/
-	saltedID, err := m.tokenStore.SaltID(ctx, token)
+	saltCtx := ctx
+	saltedID, err := m.tokenStore.SaltID(saltCtx, token)
 	if err != nil {
 		return err
 	}
 
-	// leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
-	leaseSaltedID, err := m.tokenStore.SaltID(ctx, le.LeaseID)
+	leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
 	if err != nil {
 		return err
 	}
@@ -2143,16 +2151,14 @@ func (m *ExpirationManager) indexByToken(ctx context.Context, le *leaseEntry) (*
 				saltCtx = namespace.ContextWithNamespace(ctx, tokenNS)
 			}
 		}
-
-		saltedID, err := m.tokenStore.SaltID(saltCtx, le.ClientToken)
 	*/
-	saltedID, err := m.tokenStore.SaltID(ctx, le.ClientToken)
+	saltCtx := ctx
+	saltedID, err := m.tokenStore.SaltID(saltCtx, le.ClientToken)
 	if err != nil {
 		return nil, err
 	}
 
-	// leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
-	leaseSaltedID, err := m.tokenStore.SaltID(ctx, le.LeaseID)
+	leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
 	if err != nil {
 		return nil, err
 	}
@@ -2191,16 +2197,14 @@ func (m *ExpirationManager) removeIndexByToken(ctx context.Context, le *leaseEnt
 				tokenNS = namespace.RootNamespace
 			}
 		}
-
-		saltedID, err := m.tokenStore.SaltID(saltCtx, token)
 	*/
-	saltedID, err := m.tokenStore.SaltID(ctx, token)
+	saltCtx := ctx
+	saltedID, err := m.tokenStore.SaltID(saltCtx, token)
 	if err != nil {
 		return err
 	}
 
-	// leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
-	leaseSaltedID, err := m.tokenStore.SaltID(ctx, le.LeaseID)
+	leaseSaltedID, err := m.tokenStore.SaltID(saltCtx, le.LeaseID)
 	if err != nil {
 		return err
 	}
@@ -2236,8 +2240,10 @@ func (m *ExpirationManager) CreateOrFetchRevocationLeaseByToken(ctx context.Cont
 	leaseID := path.Join(te.Path, saltedID)
 
 	//if tokenNS.ID != namespace.RootNamespaceID {
-	//	leaseID = fmt.Sprintf("%s.%s", leaseID, tokenNS.ID)
-	//}
+	//leaseID = fmt.Sprintf("%s.%s", leaseID, tokenNS.ID)
+	if te.NamespaceID != namespace.RootNamespaceID {
+		leaseID = fmt.Sprintf("%s.%s", leaseID, te.NamespaceID)
+	}
 
 	// Load the entry
 	le, err := m.loadEntry(ctx, leaseID)
@@ -2267,6 +2273,11 @@ func (m *ExpirationManager) CreateOrFetchRevocationLeaseByToken(ctx context.Cont
 			return "", consts.ErrPathContainsParentReferences
 		}
 
+		ns, err := namespace.FromContext(ctx)
+		if err != nil {
+			return "", err
+		}
+
 		// Create a lease entry
 		now := time.Now()
 		le = &leaseEntry{
@@ -2276,8 +2287,8 @@ func (m *ExpirationManager) CreateOrFetchRevocationLeaseByToken(ctx context.Cont
 			Path:        te.Path,
 			IssueTime:   now,
 			ExpireTime:  now.Add(time.Nanosecond),
-			// namespace:   tokenNS,
-			Version: 1,
+			namespace:   ns,
+			Version:     1,
 		}
 
 		// Encode the entry
@@ -2302,9 +2313,9 @@ func (m *ExpirationManager) lookupLeasesByToken(ctx context.Context, te *logical
 		}
 
 		saltCtx := namespace.ContextWithNamespace(ctx, tokenNS)
-		saltedID, err := m.tokenStore.SaltID(saltCtx, te.ID)
 	*/
-	saltedID, err := m.tokenStore.SaltID(ctx, te.ID)
+	saltCtx := ctx
+	saltedID, err := m.tokenStore.SaltID(saltCtx, te.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -2554,27 +2565,21 @@ func (m *ExpirationManager) markLeaseIrrevocable(ctx context.Context, le *leaseE
 	m.nonexpiring.Delete(le.LeaseID)
 }
 
-/*
 func (m *ExpirationManager) getNamespaceFromLeaseID(ctx context.Context, leaseID string) (*namespace.Namespace, error) {
 	_, nsID := namespace.SplitIDFromString(leaseID)
 
 	// avoid re-declaring leaseNS and err with scope inside the if
-	leaseNS := namespace.RootNamespace
-	var err error
-	if nsID != "" {
-		leaseNS, err = NamespaceByID(ctx, nsID, m.core)
-		if err != nil {
-			return nil, err
-		}
+	leaseNS, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	if leaseNS == nil {
-		return nil, namespace.ErrNoNamespace
+	if nsID != "" {
+		//leaseNS, err = NamespaceByID(ctx, nsID, m.core)
+		leaseNS.ID = nsID
 	}
 
 	return leaseNS, nil
 }
-*/
 
 func (m *ExpirationManager) getLeaseMountAccessorLocked(ctx context.Context, leaseID string) string {
 	m.coreStateLock.RLock()
@@ -2597,25 +2602,24 @@ func (m *ExpirationManager) getLeaseMountAccessor(ctx context.Context, leaseID s
 }
 
 func (m *ExpirationManager) getIrrevocableLeaseCounts(ctx context.Context, includeChildNamespaces bool) (map[string]interface{}, error) {
-	//requestNS, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	m.logger.Error("could not get namespace from context", "error", err)
-	//	return nil, err
-	//}
+	requestNS, err := namespace.FromContext(ctx)
+	if err != nil {
+		m.logger.Error("could not get namespace from context", "error", err)
+		return nil, err
+	}
 
 	numMatchingLeasesPerMount := make(map[string]int)
 	numMatchingLeases := 0
 	m.irrevocable.Range(func(k, v interface{}) bool {
 		leaseID := k.(string)
-		//leaseNS, err := m.getNamespaceFromLeaseID(ctx, leaseID)
-		//if err != nil {
-		// We should probably note that an error occured, but continue counting
-		//m.logger.Warn("could not get lease namespace from ID", "error", err)
-		//return true
-		//}
+		leaseNS, err := m.getNamespaceFromLeaseID(ctx, leaseID)
+		if err != nil {
+			// We should probably note that an error occured, but continue counting
+			m.logger.Warn("could not get lease namespace from ID", "error", err)
+			return true
+		}
 
-		// leaseMatches := (leaseNS == requestNS) || (includeChildNamespaces && leaseNS.HasParent(requestNS))
-		leaseMatches := includeChildNamespaces
+		leaseMatches := (leaseNS == requestNS) || (includeChildNamespaces && leaseNS.HasParent(requestNS))
 		if !leaseMatches {
 			// the lease doesn't meet our criteria, so keep looking
 			return true
@@ -2651,11 +2655,11 @@ type leaseResponse struct {
 // limit specifies how many results to return, and must be >0
 // includeAll specifies if all results should be returned, regardless of limit
 func (m *ExpirationManager) listIrrevocableLeases(ctx context.Context, includeChildNamespaces, returnAll bool, limit int) (map[string]interface{}, string, error) {
-	//requestNS, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	m.logger.Error("could not get namespace from context", "error", err)
-	//	return nil, "", err
-	//}
+	requestNS, err := namespace.FromContext(ctx)
+	if err != nil {
+		m.logger.Error("could not get namespace from context", "error", err)
+		return nil, "", err
+	}
 
 	// map of mount point : lease info
 	matchingLeases := make([]*leaseResponse, 0)
@@ -2665,15 +2669,14 @@ func (m *ExpirationManager) listIrrevocableLeases(ctx context.Context, includeCh
 		leaseID := k.(string)
 		leaseInfo := v.(*leaseEntry)
 
-		//leaseNS, err := m.getNamespaceFromLeaseID(ctx, leaseID)
-		//if err != nil {
-		// We probably want to track that an error occured, but continue counting
-		//	m.logger.Warn("could not get lease namespace from ID", "error", err)
-		//	return true
-		//}
+		leaseNS, err := m.getNamespaceFromLeaseID(ctx, leaseID)
+		if err != nil {
+			// We probably want to track that an error occured, but continue counting
+			m.logger.Warn("could not get lease namespace from ID", "error", err)
+			return true
+		}
 
-		// leaseMatches := (leaseNS == requestNS) || (includeChildNamespaces && leaseNS.HasParent(requestNS))
-		leaseMatches := includeChildNamespaces
+		leaseMatches := (leaseNS == requestNS) || (includeChildNamespaces && leaseNS.HasParent(requestNS))
 		if !leaseMatches {
 			// the lease doesn't meet our criteria, so keep looking
 			return true
@@ -2739,7 +2742,7 @@ type leaseEntry struct {
 	// namespace, and V1 has secondary indexes live in the matching namespace.
 	Version int `json:"version"`
 
-	// namespace *namespace.Namespace
+	namespace *namespace.Namespace
 
 	// RevokeErr tracks if a lease has failed revocation in a way that is
 	// unlikely to be automatically resolved. The first time this happens,
@@ -2793,9 +2796,8 @@ func (le *leaseEntry) nonexpiringToken() bool {
 	}
 	// Note that at this time the only non-expiring tokens are root tokens, this test is more involved as it is trying
 	// to catch tokens created by the VAULT-1949 non-expiring tokens bug and ensure they become expiring.
-	// return !le.Auth.LeaseEnabled() && len(le.Auth.Policies) == 1 && le.Auth.Policies[0] == "root" && le.namespace != nil &&
-	//	le.namespace.ID == namespace.RootNamespaceID
-	return !le.Auth.LeaseEnabled() && len(le.Auth.Policies) == 1 && le.Auth.Policies[0] == "root"
+	return !le.Auth.LeaseEnabled() && len(le.Auth.Policies) == 1 && le.Auth.Policies[0] == "root" && le.namespace != nil &&
+		le.namespace.ID == namespace.RootNamespaceID
 }
 
 // TODO maybe lock RevokeErr once this goes in: https://github.com/openbao/openbao/pull/11122

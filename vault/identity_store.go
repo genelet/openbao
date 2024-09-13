@@ -16,13 +16,12 @@ import (
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/helper/identity"
 
-	//"github.com/openbao/openbao/helper/metricsutil"
+	"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
 	"github.com/openbao/openbao/helper/versions"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	//"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -58,7 +57,7 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		router:       core.router,
 		redirectAddr: core.redirectAddr,
 		localNode:    core,
-		// namespacer:    core,
+		//namespacer:    core,
 		metrics:       core.MetricSink(),
 		totpPersister: core,
 		groupUpdater:  core,
@@ -1162,17 +1161,18 @@ func (i *IdentityStore) CreateEntity(ctx context.Context) (*identity.Entity, err
 
 	// Emit a metric for the new entity
 	//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
-	//var nsLabel metrics.Label
-	//if err != nil {
-	//	nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
-	//} else {
-	//	nsLabel = metricsutil.NamespaceLabel(ns)
-	//}
+	ns, err := namespace.FromContext(ctx)
+	var nsLabel metrics.Label
+	if err != nil {
+		nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
+	} else {
+		nsLabel = metricsutil.NamespaceLabel(ns)
+	}
 	i.metrics.IncrCounterWithLabels(
 		[]string{"identity", "entity", "creation"},
 		1,
 		[]metrics.Label{
-			// nsLabel,
+			nsLabel,
 		})
 
 	return entity.Clone()
@@ -1270,17 +1270,18 @@ func (i *IdentityStore) CreateOrFetchEntity(ctx context.Context, alias *logical.
 
 		// Emit a metric for the new entity
 		//ns, err := i.namespacer.NamespaceByID(ctx, entity.NamespaceID)
-		//var nsLabel metrics.Label
-		//if err != nil {
-		//	nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
-		//} else {
-		//	nsLabel = metricsutil.NamespaceLabel(ns)
-		//}
+		ns, err := namespace.FromContext(ctx)
+		var nsLabel metrics.Label
+		if err != nil {
+			nsLabel = metrics.Label{Name: "namespace", Value: "unknown"}
+		} else {
+			nsLabel = metricsutil.NamespaceLabel(ns)
+		}
 		i.metrics.IncrCounterWithLabels(
 			[]string{"identity", "entity", "creation"},
 			1,
 			[]metrics.Label{
-				// nsLabel,
+				nsLabel,
 				{Name: "auth_method", Value: newAlias.MountType},
 				{Name: "mount_point", Value: newAlias.MountPath},
 			})

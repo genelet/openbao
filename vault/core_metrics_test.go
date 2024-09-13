@@ -336,16 +336,17 @@ func TestCoreMetrics_EntityGauges(t *testing.T) {
 	// in this case auth_method, in each metrics.Label slice
 	sort.Slice(glv, func(i, j int) bool { return glv[i].Labels[0].Value < glv[j].Labels[0].Value })
 
+	// namespace is an property of identity store, not the mount accessor. We should expect 2 here.
 	metricLabelsMatch(t, glv[0].Labels,
 		map[string]string{
-			"namespace":   "root",
+			//			"namespace":   "root",
 			"auth_method": "approle",
 			"mount_point": "auth/approle/",
 		})
 
 	metricLabelsMatch(t, glv[1].Labels,
 		map[string]string{
-			"namespace":   "root",
+			//			"namespace":   "root",
 			"auth_method": "userpass",
 			"mount_point": "auth/userpass/",
 		})

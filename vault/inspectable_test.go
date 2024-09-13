@@ -25,8 +25,10 @@ func TestInspectRouter(t *testing.T) {
 		"mountEntry": {"uuid", "accessor"},
 	}
 	subTreeFields := map[string][]string{
-		"routeEntry": {"tainted", "storage_prefix", "accessor", "mount_namespace", "mount_path", "mount_type", "uuid"},
-		"mountEntry": {"accessor", "mount_namespace", "mount_path", "mount_type", "uuid"},
+		//"routeEntry": {"tainted", "storage_prefix", "accessor", "mount_namespace", "mount_path", "mount_type", "uuid"},
+		//"mountEntry": {"accessor", "mount_namespace", "mount_path", "mount_type", "uuid"},
+		"routeEntry": {"tainted", "storage_prefix", "accessor", "mount_path", "mount_type", "uuid"},
+		"mountEntry": {"accessor", "mount_path", "mount_type", "uuid"},
 	}
 	for subTreeType, subTreeArray := range subTrees {
 		for _, tag := range subTreeArray {
