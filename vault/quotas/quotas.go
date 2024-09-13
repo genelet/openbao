@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/openbao/openbao/helper/locking"
 	"github.com/openbao/openbao/helper/metricsutil"
+	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/pathmanager"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
@@ -1119,8 +1120,7 @@ func QuotaStoragePath(quotaType, name string) string {
 // HandleRemount updates the quota subsystem about the remount operation that
 // took place. Quota manager will trigger the quota specific updates including
 // the mount path update and the namespace update
-// func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPathDetails) error {
-func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error {
+func (m *Manager) HandleRemount(ctx context.Context, from, to namespace.MountPathDetails) error {
 	m.quotaLock.Lock()
 	m.dbAndCacheLock.RLock()
 	defer m.quotaLock.Unlock()
@@ -1132,15 +1132,15 @@ func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error 
 
 	// quota namespace would have been made non-empty during insertion. Use non-empty value
 	// during query as well.
-	//fromNs := from.Namespace.Path
-	//if fromNs == "" {
-	//	fromNs = namespace.RootNamespaceID
-	//}
+	fromNs := from.Namespace.Path
+	if fromNs == "" {
+		fromNs = namespace.RootNamespaceID
+	}
 
-	//toNs := to.Namespace.Path
-	//if toNs == "" {
-	//	toNs = namespace.RootNamespaceID
-	//}
+	toNs := to.Namespace.Path
+	if toNs == "" {
+		toNs = namespace.RootNamespaceID
+	}
 
 	updateMounts := func(idx string, args ...interface{}) error {
 		for _, quotaType := range quotaTypes() {
@@ -1153,7 +1153,7 @@ func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error 
 
 				// Clone the object and update it
 				clonedQuota := quota.Clone()
-				clonedQuota.handleRemount(toNs, toNs)
+				clonedQuota.handleRemount(to.MountPath, toNs)
 				// Update both underlying storage and memdb with the quota change
 				entry, err := logical.StorageEntryJSON(QuotaStoragePath(quotaType, quota.QuotaName()), quota)
 				if err != nil {
@@ -1171,19 +1171,19 @@ func (m *Manager) HandleRemount(ctx context.Context, fromNs, toNs string) error 
 	}
 
 	// Update mounts for everything without a path prefix or role
-	err := updateMounts(indexNamespaceMount, fromNs, fromNs, false, false)
+	err := updateMounts(indexNamespaceMount, fromNs, from.MountPath, false, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a path prefix
-	err = updateMounts(indexNamespaceMount, fromNs, fromNs, true, false)
+	err = updateMounts(indexNamespaceMount, fromNs, from.MountPath, true, false)
 	if err != nil {
 		return err
 	}
 
 	// Update mounts for everything with a role
-	err = updateMounts(indexNamespaceMount, fromNs, fromNs, false, true)
+	err = updateMounts(indexNamespaceMount, fromNs, from.MountPath, false, true)
 	if err != nil {
 		return err
 	}

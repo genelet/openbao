@@ -1281,11 +1281,10 @@ func validateMountPath(p string) error {
 
 // handleRemount is used to remount a path
 func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	//ns, err := namespace.FromContext(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
-	var err error
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get the paths
 	fromPath := data.Get("from").(string)
@@ -1303,39 +1302,39 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("'to' path cannot contain trailing whitespace"), logical.ErrInvalidRequest
 	}
 
-	// fromPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, fromPath)
-	// toPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, toPath)
+	fromPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, fromPath)
+	toPathDetails := b.Core.splitNamespaceAndMountFromPath(ns.Path, toPath)
 
-	if err = validateMountPath(toPath); err != nil {
+	if err = validateMountPath(toPathDetails.MountPath); err != nil {
 		return handleError(fmt.Errorf("invalid destination mount: %v", err))
 	}
 
 	// Check that target is a valid auth mount, if source is an auth mount
-	if strings.HasPrefix(fromPath, credentialRoutePrefix) {
-		if !strings.HasPrefix(toPath, credentialRoutePrefix) {
-			return handleError(fmt.Errorf("cannot remount auth mount to non-auth mount %q", toPath))
+	if strings.HasPrefix(fromPathDetails.MountPath, credentialRoutePrefix) {
+		if !strings.HasPrefix(toPathDetails.MountPath, credentialRoutePrefix) {
+			return handleError(fmt.Errorf("cannot remount auth mount to non-auth mount %q", toPathDetails.MountPath))
 		}
 		// Prevent target and source auth mounts from being in a protected path
 		for _, auth := range protectedAuths {
-			if strings.HasPrefix(fromPath, auth) {
-				return handleError(fmt.Errorf("cannot remount %q", fromPath))
+			if strings.HasPrefix(fromPathDetails.MountPath, auth) {
+				return handleError(fmt.Errorf("cannot remount %q", fromPathDetails.MountPath))
 			}
 		}
 
 		for _, auth := range protectedAuths {
-			if strings.HasPrefix(toPath, auth) {
-				return handleError(fmt.Errorf("cannot remount to destination %q", toPath))
+			if strings.HasPrefix(toPathDetails.MountPath, auth) {
+				return handleError(fmt.Errorf("cannot remount to destination %q", toPathDetails.MountPath))
 			}
 		}
 	} else {
 		// Prevent target and source non-auth mounts from being in a protected path
 		for _, p := range protectedMounts {
-			if strings.HasPrefix(fromPath, p) {
-				return handleError(fmt.Errorf("cannot remount %q", fromPath))
+			if strings.HasPrefix(fromPathDetails.MountPath, p) {
+				return handleError(fmt.Errorf("cannot remount %q", fromPathDetails.MountPath))
 			}
 
-			if strings.HasPrefix(toPath, p) {
-				return handleError(fmt.Errorf("cannot remount to destination %+v", toPath))
+			if strings.HasPrefix(toPathDetails.MountPath, p) {
+				return handleError(fmt.Errorf("cannot remount to destination %+v", toPathDetails.MountPath))
 			}
 		}
 	}
@@ -1350,7 +1349,7 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 		return handleError(fmt.Errorf("path already in use at %q", match))
 	}
 
-	migrationID, err := b.Core.createMigrationStatus(fromPath, toPath)
+	migrationID, err := b.Core.createMigrationStatus(fromPathDetails, toPathDetails)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating migration status %+v", err)
 	}
@@ -1361,7 +1360,7 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 
 		logger := b.Core.Logger().Named("mounts.migration").With("migration_id", migrationID, "namespace", namespace.RootNamespaceID, "to_path", toPath, "from_path", fromPath)
 
-		err := b.moveMount(logger, migrationID, entry, fromPath, toPath)
+		err := b.moveMount(ns, logger, migrationID, entry, fromPathDetails, toPathDetails)
 		if err != nil {
 			logger.Error("remount failed", "error", err)
 			if err := b.Core.setMigrationStatus(migrationID, MigrationFailureStatus); err != nil {
@@ -1382,19 +1381,17 @@ func (b *SystemBackend) handleRemount(ctx context.Context, req *logical.Request,
 // moveMount carries out a remount operation on the secrets engine or auth method, updating the migration status as required
 // It is expected to be called asynchronously outside of a request context, hence it creates a context derived from the active one
 // and intermittently checks to see if it is still open.
-// func (b *SystemBackend) moveMount(ns *namespace.Namespace, logger log.Logger, migrationID string, entry *MountEntry, fromPath, toPath string) error {
-func (b *SystemBackend) moveMount(logger log.Logger, migrationID string, entry *MountEntry, fromPath, toPath string) error {
+func (b *SystemBackend) moveMount(ns *namespace.Namespace, logger log.Logger, migrationID string, entry *MountEntry, fromPathDetails, toPathDetails namespace.MountPathDetails) error {
 	logger.Info("Starting to update the mount table and revoke leases")
-	// revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
-	revokeCtx := b.Core.activeContext
+	revokeCtx := namespace.ContextWithNamespace(b.Core.activeContext, ns)
 
 	var err error
 	// Attempt remount
 	switch entry.Table {
 	case credentialTableType:
-		err = b.Core.remountCredential(revokeCtx, fromPath, toPath, true)
+		err = b.Core.remountCredential(revokeCtx, fromPathDetails, toPathDetails, true)
 	case mountTableType:
-		err = b.Core.remountSecretsEngine(revokeCtx, fromPath, toPath, true)
+		err = b.Core.remountSecretsEngine(revokeCtx, fromPathDetails, toPathDetails, true)
 	default:
 		return fmt.Errorf("cannot remount mount of table %q", entry.Table)
 	}
@@ -1409,7 +1406,7 @@ func (b *SystemBackend) moveMount(logger log.Logger, migrationID string, entry *
 
 	logger.Info("Updating quotas associated with the source mount")
 	// Update quotas with the new path and namespace
-	if err := b.Core.quotaManager.HandleRemount(revokeCtx, fromPath, toPath); err != nil {
+	if err := b.Core.quotaManager.HandleRemount(revokeCtx, fromPathDetails, toPathDetails); err != nil {
 		return err
 	}
 

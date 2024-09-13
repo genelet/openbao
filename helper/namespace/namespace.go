@@ -145,18 +145,15 @@ func SplitIDFromString(input string) (string, string) {
 // consisting of the namespace of the mount and the path of the
 // mount within the namespace
 type MountPathDetails struct {
-	// Namespace *Namespace
+	Namespace *Namespace
 	MountPath string
 }
 
-// func (mpd *MountPathDetails) GetRelativePath(currNs *Namespace) string {
-func (mpd *MountPathDetails) GetRelativePath() string {
-	// subNsPath := strings.TrimPrefix(mpd.Namespace.Path, currNs.Path)
-	// return subNsPath + mpd.MountPath
-	return mpd.MountPath
+func (mpd *MountPathDetails) GetRelativePath(currNs *Namespace) string {
+	subNsPath := strings.TrimPrefix(mpd.Namespace.Path, currNs.Path)
+	return subNsPath + mpd.MountPath
 }
 
 func (mpd *MountPathDetails) GetFullPath() string {
-	// return mpd.Namespace.Path + mpd.MountPath
-	return mpd.MountPath
+	return mpd.Namespace.Path + mpd.MountPath
 }

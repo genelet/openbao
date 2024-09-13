@@ -651,7 +651,7 @@ func TestCore_CredentialInitialize(t *testing.T) {
 					UUID:             "abcd",
 					Accessor:         "initable-abcd",
 					BackendAwareUUID: "abcde",
-					// NamespaceID:      namespace.RootNamespaceID,
+					NamespaceID:      namespace.RootNamespaceID,
 					// namespace:        namespace.RootNamespace,
 				},
 			},
@@ -674,9 +674,9 @@ func TestCore_CredentialInitialize(t *testing.T) {
 }
 
 func remountCredentialFromRoot(c *Core, src, dst string, updateStorage bool) error {
-	// srcPathDetails := c.splitNamespaceAndMountFromPath("", src)
-	// dstPathDetails := c.splitNamespaceAndMountFromPath("", dst)
-	return c.remountCredential(namespace.RootContext(nil), src, dst, updateStorage)
+	srcPathDetails := c.splitNamespaceAndMountFromPath("", src)
+	dstPathDetails := c.splitNamespaceAndMountFromPath("", dst)
+	return c.remountCredential(namespace.RootContext(nil), srcPathDetails, dstPathDetails, updateStorage)
 }
 
 func TestCore_RemountCredential(t *testing.T) {

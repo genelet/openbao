@@ -1095,6 +1095,7 @@ func TestSystemBackend_remount_system(t *testing.T) {
 	if err != logical.ErrInvalidRequest {
 		t.Fatalf("err: %v", err)
 	}
+	// if !strings.Contains(resp.Data["error"].(string), "cannot remount \"sys/\"") {
 	if !strings.Contains(resp.Data["error"].(string), "cannot remount \"sys/\"") {
 		t.Fatalf("Found unexpected error %q", resp.Data["error"].(string))
 	}

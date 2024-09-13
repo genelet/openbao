@@ -262,7 +262,7 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	backend := c.router.MatchingBackend(ctx, path)
 
 	// Mark the entry as tainted
-	if err := c.taintCredEntry(ctx, path, updateStorage); err != nil {
+	if err := c.taintCredEntry(ctx, ns.ID, path, updateStorage); err != nil {
 		return err
 	}
 
@@ -353,34 +353,34 @@ func (c *Core) removeCredEntry(ctx context.Context, path string, updateStorage b
 	return nil
 }
 
-func (c *Core) remountCredential(ctx context.Context, src, dst string, updateStorage bool) error {
-	//	ns, err := namespace.FromContext(ctx)
-	//	if err != nil {
-	//		return err
-	//	}
+func (c *Core) remountCredential(ctx context.Context, src, dst namespace.MountPathDetails, updateStorage bool) error {
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
 
-	if !strings.HasPrefix(src, credentialRoutePrefix) {
+	if !strings.HasPrefix(src.MountPath, credentialRoutePrefix) {
 		return fmt.Errorf("cannot remount non-auth mount %q", src)
 	}
 
-	if !strings.HasPrefix(dst, credentialRoutePrefix) {
+	if !strings.HasPrefix(dst.MountPath, credentialRoutePrefix) {
 		return fmt.Errorf("cannot remount auth mount to non-auth mount %q", dst)
 	}
 
 	for _, auth := range protectedAuths {
-		if strings.HasPrefix(src, auth) {
+		if strings.HasPrefix(src.MountPath, auth) {
 			return fmt.Errorf("cannot remount %q", src)
 		}
 	}
 
 	for _, auth := range protectedAuths {
-		if strings.HasPrefix(dst, auth) {
+		if strings.HasPrefix(dst.MountPath, auth) {
 			return fmt.Errorf("cannot remount to %q", dst)
 		}
 	}
 
-	srcRelativePath := src
-	dstRelativePath := dst
+	srcRelativePath := src.GetRelativePath(ns)
+	dstRelativePath := dst.GetRelativePath(ns)
 
 	// Verify exact match of the route
 	srcMatch := c.router.MatchingMountEntry(ctx, srcRelativePath)
@@ -393,7 +393,7 @@ func (c *Core) remountCredential(ctx context.Context, src, dst string, updateSto
 	}
 
 	// Mark the entry as tainted
-	if err := c.taintCredEntry(ctx, src, updateStorage); err != nil {
+	if err := c.taintCredEntry(ctx, src.Namespace.ID, src.MountPath, updateStorage); err != nil {
 		return err
 	}
 
@@ -403,10 +403,9 @@ func (c *Core) remountCredential(ctx context.Context, src, dst string, updateSto
 	}
 
 	if c.expiration != nil {
-		// revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
-		revokeCtx := ctx
+		revokeCtx := namespace.ContextWithNamespace(ctx, src.Namespace)
 		// Revoke all the dynamic keys
-		if err := c.expiration.RevokePrefix(revokeCtx, src, true); err != nil {
+		if err := c.expiration.RevokePrefix(revokeCtx, src.MountPath, true); err != nil {
 			return err
 		}
 	}
@@ -418,10 +417,10 @@ func (c *Core) remountCredential(ctx context.Context, src, dst string, updateSto
 	}
 
 	srcMatch.Tainted = false
-	// srcMatch.NamespaceID = dst.Namespace.ID
+	srcMatch.NamespaceID = dst.Namespace.ID
 	// srcMatch.namespace = dst.Namespace
 	srcPath := srcMatch.Path
-	srcMatch.Path = strings.TrimPrefix(dst, credentialRoutePrefix)
+	srcMatch.Path = strings.TrimPrefix(dst.MountPath, credentialRoutePrefix)
 
 	// Update the mount table
 	if err := c.persistAuth(ctx, c.auth, &srcMatch.Local); err != nil {
@@ -475,15 +474,14 @@ func (c *Core) remountCredEntryForceInternal(ctx context.Context, path string, u
 }
 
 // taintCredEntry is used to mark an entry in the auth table as tainted
-// func (c *Core) taintCredEntry(ctx context.Context, nsID, path string, updateStorage bool) error {
-func (c *Core) taintCredEntry(ctx context.Context, path string, updateStorage bool) error {
+func (c *Core) taintCredEntry(ctx context.Context, nsID, path string, updateStorage bool) error {
 	c.authLock.Lock()
 	defer c.authLock.Unlock()
 
 	// Taint the entry from the auth table
 	// We do this on the original since setting the taint operates
 	// on the entries which a shallow clone shares anyways
-	entry, err := c.auth.setTaint(strings.TrimPrefix(path, credentialRoutePrefix), true, mountStateUnmounting)
+	entry, err := c.auth.setTaint(nsID, strings.TrimPrefix(path, credentialRoutePrefix), true, mountStateUnmounting)
 	if err != nil {
 		return err
 	}
