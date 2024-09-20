@@ -1066,6 +1066,11 @@ path "baz/quux" {
 }
 `
 
+var (
+	aclNamespace  = `dev`
+	aclNamespace2 = `dev2`
+)
+
 // test merging
 var mergingPolicies = `
 name = "ops"

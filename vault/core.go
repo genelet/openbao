@@ -374,6 +374,11 @@ type Core struct {
 	// policy store is used to manage named ACL policies
 	policyStore *PolicyStore
 
+	// oss start
+	// namespace Store is used to manage namespaces
+	namespaceStore *NamespaceStore
+	// oss end
+
 	// token store is used to manage authentication tokens
 	tokenStore *TokenStore
 
@@ -2248,6 +2253,11 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 	if err := c.setupPolicyStore(ctx); err != nil {
 		return err
 	}
+	// oss start
+	if err := c.setupNamespaceStore(ctx); err != nil {
+		return err
+	}
+	// oss end
 	if err := c.loadCORSConfig(ctx); err != nil {
 		return err
 	}
@@ -2461,6 +2471,11 @@ func (c *Core) preSeal() error {
 	if err := c.teardownPolicyStore(); err != nil {
 		result = multierror.Append(result, fmt.Errorf("error tearing down policy store: %w", err))
 	}
+	// oss start
+	if err := c.teardownNamespaceStore(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("error tearing down namespaces store: %w", err))
+	}
+	// oss end
 	if err := c.stopRollback(); err != nil {
 		result = multierror.Append(result, fmt.Errorf("error stopping rollback: %w", err))
 	}
