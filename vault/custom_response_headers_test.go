@@ -57,7 +57,7 @@ var customHeader400 = map[string]string{
 func TestConfigCustomHeaders(t *testing.T) {
 	logger := logging.NewVaultLogger(log.Trace)
 	// oss start
-	//phys, err := inmem.NewInmem(nil, logger)
+	// phys, err := inmem.NewInmem(nil, logger)
 	phys, err := newTD(logger)
 	// oss end
 	if err != nil {

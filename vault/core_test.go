@@ -316,7 +316,7 @@ func TestNewCore_configureListeners(t *testing.T) {
 			// We need to init some values ourselves, usually CreateCore does this for us.
 			logger := corehelpers.NewTestLogger(t)
 			// oss start
-			//backend, err := inmem.NewInmem(nil, logger)
+			// backend, err := inmem.NewInmem(nil, logger)
 			backend, err := newTD(logger)
 			// oss end
 			require.NoError(t, err)

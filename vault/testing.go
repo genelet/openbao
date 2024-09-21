@@ -226,7 +226,7 @@ func newTD(logger log.Logger) (physical.Backend, error) {
 func TestCoreWithSealAndUINoCleanup(t testing.T, opts *CoreConfig) *Core {
 	logger := corehelpers.NewTestLogger(t)
 	// oss start
-	//physicalBackend, err := physInmem.NewInmem(nil, logger)
+	// physicalBackend, err := physInmem.NewInmem(nil, logger)
 	physicalBackend, err := newTD(logger)
 	// oss end
 	if err != nil {
