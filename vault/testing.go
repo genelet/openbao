@@ -54,6 +54,10 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/sdk/v2/physical"
 	physInmem "github.com/openbao/openbao/sdk/v2/physical/inmem"
+
+	// oss start
+	tdengine "github.com/openbao/openbao/physical/tdengine"
+	// oss end
 	backendplugin "github.com/openbao/openbao/sdk/v2/plugin"
 	"github.com/openbao/openbao/vault/cluster"
 	"github.com/openbao/openbao/vault/seal"
@@ -200,13 +204,34 @@ func TestCoreWithSealAndUI(t testing.T, opts *CoreConfig) *Core {
 	return c
 }
 
+// oss start
+func newTD(logger log.Logger) (physical.Backend, error) {
+	physicalBackend, err := tdengine.NewTDEngineBackend(nil, logger)
+	if err == nil {
+		err = physicalBackend.(*tdengine.TDEngineBackend).DeleteAll(
+			namespace.ContextWithNamespace(context.Background(),
+				&namespace.Namespace{
+					ID:             namespace.RootNamespace.ID,
+					CustomMetadata: map[string]string{},
+				},
+			),
+		)
+	}
+
+	return physicalBackend, err
+}
+
+// oss end
+
 func TestCoreWithSealAndUINoCleanup(t testing.T, opts *CoreConfig) *Core {
 	logger := corehelpers.NewTestLogger(t)
-	physicalBackend, err := physInmem.NewInmem(nil, logger)
+	// oss start
+	//physicalBackend, err := physInmem.NewInmem(nil, logger)
+	physicalBackend, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	errInjector := physical.NewErrorInjector(physicalBackend, 0, logger)
 
 	// Start off with base test core config
@@ -255,7 +280,6 @@ func TestCoreWithSealAndUINoCleanup(t testing.T, opts *CoreConfig) *Core {
 	}
 
 	testApplyEntBaseConfig(conf, opts)
-
 	c, err := NewCore(conf)
 	if err != nil {
 		t.Fatalf("err: %s", err)
@@ -1614,7 +1638,10 @@ func NewTestCluster(t testing.T, base *CoreConfig, opts *TestClusterOptions) *Te
 	}
 
 	if coreConfig.Physical == nil && (opts == nil || opts.PhysicalFactory == nil) {
-		coreConfig.Physical, err = physInmem.NewInmem(nil, testCluster.Logger)
+		// oss start
+		// coreConfig.Physical, err = physInmem.NewInmem(nil, testCluster.Logger)
+		coreConfig.Physical, err = newTD(testCluster.Logger)
+		// oss end
 		if err != nil {
 			t.Fatal(err)
 		}

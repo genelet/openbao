@@ -12,7 +12,9 @@ import (
 	wrapping "github.com/openbao/go-kms-wrapping/v2"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	"github.com/openbao/openbao/sdk/v2/physical/inmem"
+	// oss start
+	//"github.com/openbao/openbao/sdk/v2/physical/inmem"
+	// oss end
 )
 
 func TestCore_Init(t *testing.T) {
@@ -27,7 +29,10 @@ func testCore_NewTestCore(t *testing.T, seal Seal) (*Core, *CoreConfig) {
 func testCore_NewTestCoreLicensing(t *testing.T, seal Seal) (*Core, *CoreConfig) {
 	logger := logging.NewVaultLogger(log.Trace)
 
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatal(err)
 	}

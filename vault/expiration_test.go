@@ -28,7 +28,6 @@ import (
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/sdk/v2/physical"
-	"github.com/openbao/openbao/sdk/v2/physical/inmem"
 )
 
 var testImagePull sync.Once
@@ -691,7 +690,10 @@ func BenchmarkExpiration_Restore_Consul(b *testing.B) {
 
 func BenchmarkExpiration_Restore_InMem(b *testing.B) {
 	logger := logging.NewVaultLogger(log.Trace)
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -763,7 +765,10 @@ func benchmarkExpirationBackend(b *testing.B, physicalBackend physical.Backend, 
 
 func BenchmarkExpiration_Create_Leases(b *testing.B) {
 	logger := logging.NewVaultLogger(log.Trace)
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		b.Fatal(err)
 	}

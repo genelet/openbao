@@ -430,6 +430,25 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// DeleteAll is used to cleanup
+func (m *TDEngineBackend) DeleteAll(ctx context.Context) error {
+	defer metrics.MeasureSince([]string{"tdengine", "invalidate"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.db.ExecContext(ctx, "DELETE FROM "+tname)
+	if err != nil {
+		m.logger.Debug("tdengine delete all", "table", tname)
+	}
+	return err
+}
+
 // List is used to list all the keys under a given
 // prefix, up to the next prefix.
 func (m *TDEngineBackend) List(ctx context.Context, prefix string) ([]string, error) {

@@ -18,6 +18,7 @@ import (
 	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
+	"github.com/openbao/openbao/sdk/v2/physical"
 )
 
 func (c *Core) NamespaceByID(ctx context.Context, nsID string) (*namespace.Namespace, error) {
@@ -323,8 +324,38 @@ func (c *Core) teardownNamespaceStore() error {
 	return nil
 }
 
-func (ps *NamespaceStore) invalidate(_ context.Context, _ string) {
+func (ps *NamespaceStore) invalidate(ctx context.Context, path string) error {
+	if td, ok := ps.getTD(); ok {
+		ns, err := namespace.FromContext(ctx)
+		if err != nil {
+			return err
+		}
+		if ns == nil {
+			return fmt.Errorf("namespace not found in context")
+		}
+		if path == "" || path == namespace.RootNamespaceID {
+			err = td.DeleteAll(ctx)
+		} else {
+			err = ps.DeleteNamespace(ctx, path)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	ps = nil
+	return nil
+}
+
+func (ps *NamespaceStore) getTD() (td *tdengine.TDEngineBackend, ok bool) {
+	switch t := ps.core.underlyingPhysical.(type) {
+	case *physical.ErrorInjector:
+		td, ok = t.GetBackend().(*tdengine.TDEngineBackend)
+	case *tdengine.TDEngineBackend:
+		td = t
+		ok = true
+	default:
+	}
+	return td, ok
 }
 
 // SetNamespace is used to create or update the given namespace
@@ -341,10 +372,6 @@ func (ps *NamespaceStore) SetNamespace(ctx context.Context, path string, meta ma
 		return fmt.Errorf("cannot update %q namespace", path)
 	}
 
-	if init == nil && path == namespace.RootNamespaceID {
-		return fmt.Errorf(`cannot update "root" namespace`)
-	}
-
 	ps.modifyLock.Lock()
 	defer ps.modifyLock.Unlock()
 
@@ -354,13 +381,18 @@ func (ps *NamespaceStore) SetNamespace(ctx context.Context, path string, meta ma
 		return fmt.Errorf("unable to get the barrier subview for namespace")
 	}
 
-	td, ok := ps.core.underlyingPhysical.(*tdengine.TDEngineBackend)
+	td, ok := ps.getTD()
 	if !ok {
-		return fmt.Errorf("failed to get tdengine backend in set %v", init)
+		return fmt.Errorf("failed to get tdengine backend in namespace set")
 	}
-	err := td.CreateIfNotExists(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to create namespace table for %s: %w", path, err)
+
+	if init == nil && path == namespace.RootNamespaceID {
+		return fmt.Errorf(`cannot update "root" namespace`)
+	} else if path != namespace.RootNamespaceID {
+		err := td.CreateIfNotExists(ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to create namespace table for %s: %w", path, err)
+		}
 	}
 
 	// Create the entry
@@ -426,10 +458,11 @@ func (ps *NamespaceStore) ListNamespaces(ctx context.Context) ([]string, error) 
 func (ps *NamespaceStore) DeleteNamespace(ctx context.Context, path string) error {
 	defer metrics.MeasureSince([]string{"namespace", "delete_namespace"}, time.Now())
 
-	td, ok := ps.core.underlyingPhysical.(*tdengine.TDEngineBackend)
+	td, ok := ps.getTD()
 	if !ok {
 		return fmt.Errorf("failed to get tdengine backend in delete")
 	}
+
 	ps.modifyLock.Lock()
 	defer ps.modifyLock.Unlock()
 
@@ -445,7 +478,7 @@ func (ps *NamespaceStore) DeleteNamespace(ctx context.Context, path string) erro
 	}
 
 	if path == namespace.RootNamespaceID {
-		return fmt.Errorf("cannot delete root namespace")
+		return fmt.Errorf(`cannot delete "root" namespace`)
 	}
 
 	err := td.DropIfExists(ctx, path)

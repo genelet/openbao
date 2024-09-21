@@ -46,6 +46,7 @@ import (
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/osutil"
 	"github.com/openbao/openbao/physical/raft"
+	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/helper/certutil"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -2254,8 +2255,10 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 		return err
 	}
 	// oss start
-	if err := c.setupNamespaceStore(ctx); err != nil {
-		return err
+	if _, ok := c.underlyingPhysical.(*tdengine.TDEngineBackend); ok {
+		if err := c.setupNamespaceStore(ctx); err != nil {
+			return err
+		}
 	}
 	// oss end
 	if err := c.loadCORSConfig(ctx); err != nil {
