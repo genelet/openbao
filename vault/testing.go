@@ -208,7 +208,7 @@ func TestCoreWithSealAndUI(t testing.T, opts *CoreConfig) *Core {
 func newTD(logger log.Logger) (physical.Backend, error) {
 	physicalBackend, err := tdengine.NewTDEngineBackend(nil, logger)
 	if err == nil {
-		err = physicalBackend.(*tdengine.TDEngineBackend).DeleteAll(
+		err = physicalBackend.Flush(
 			namespace.ContextWithNamespace(context.Background(),
 				&namespace.Namespace{
 					ID:             namespace.RootNamespace.ID,

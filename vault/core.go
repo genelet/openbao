@@ -2255,10 +2255,18 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 		return err
 	}
 	// oss start
-	if _, ok := c.underlyingPhysical.(*tdengine.TDEngineBackend); ok {
+	switch t := c.underlyingPhysical.(type) {
+	case *tdengine.TDEngineBackend:
 		if err := c.setupNamespaceStore(ctx); err != nil {
 			return err
 		}
+	case *physical.ErrorInjector:
+		if _, ok := t.GetBackend().(*tdengine.TDEngineBackend); ok {
+			if err := c.setupNamespaceStore(ctx); err != nil {
+				return err
+			}
+		}
+	default:
 	}
 	// oss end
 	if err := c.loadCORSConfig(ctx); err != nil {

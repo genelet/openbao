@@ -152,7 +152,7 @@ var (
 		"inmem":      physInmem.NewInmem,
 		"raft":       physRaft.NewRaftBackend,
 		"postgresql": physPostgresql.NewPostgreSQLBackend,
-		"tdengine":   physTDEngine.NewTDEngineBackend,
+		"tdengine":   physTDEngine.NewTDEnginePhysicalBackend,
 	}
 
 	serviceRegistrations = map[string]sr.Factory{

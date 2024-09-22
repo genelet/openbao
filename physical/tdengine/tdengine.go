@@ -8,8 +8,8 @@ CREATE STABLE superbao  (
 	k  VARCHAR(4096),
 	v  VARBINARY(60000)
 ) TAGS (
-    NamespaceID VARCHAR(64),
-    NamespacePath VARCHAR(1024)
+    NamespaceID VARCHAR(1024),
+    NamespacePath VARCHAR(64)
 );
 
 CREATE TABLE root
@@ -34,7 +34,6 @@ import (
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/physical"
-
 	_ "github.com/taosdata/driver-go/v3/taosRestful"
 )
 
@@ -54,9 +53,13 @@ type TDEngineBackend struct {
 	conf       map[string]string
 }
 
+func NewTDEnginePhysicalBackend(conf map[string]string, logger log.Logger) (physical.Backend, error) {
+	return NewTDEngineBackend(conf, logger)
+}
+
 // NewTDEngineBackend constructs a TDEngine backend using the given API client and
 // server address and credential for accessing tdengine database.
-func NewTDEngineBackend(conf map[string]string, logger log.Logger) (physical.Backend, error) {
+func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBackend, error) {
 	connURL := conf["connection_url"]
 	if envURL := api.ReadBaoVariable("TDENGINE_CONNECTION_URL"); envURL != "" {
 		connURL = envURL
@@ -128,18 +131,31 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (physical.Bac
 		logger.Error("failed to check tdengine stable exist", "stable", sTable, "error", err)
 		return nil, fmt.Errorf("failed to check tdengine stable exist: %w", err)
 	} else if !stableExist {
-		if _, err = db.Exec("CREATE STABLE IF NOT EXISTS " + sTable + " ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(64), NamespacePath VARCHAR(1024) )"); err != nil {
+		createSTable := conf["create_stable"]
+		if createSTable == "" {
+			createSTable = `CREATE STABLE IF NOT EXISTS ` + sTable + ` ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
+		}
+		if _, err = db.Exec(createSTable); err != nil {
 			return nil, fmt.Errorf("failed to create tdengine stable %s: %w", sTable, err)
 		}
 		logger.Debug("tdengine stable created", "stable", sTable)
 	}
 
-	tname := tablename(namespace.RootNamespace)
+	tname, ok := conf["table"]
+	if !ok {
+		tname = tablename(namespace.RootNamespace)
+	}
 	tableExist, err := m.existingTable(tname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check tdengine root table exist: %w", err)
 	} else if !tableExist {
-		if _, err = m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + namespace.RootNamespace.ID + `", "" )`); err != nil {
+		id, ok := conf["ns_id"]
+		if !ok {
+			id = namespace.RootNamespaceID
+		}
+		id = strings.Trim(id, "/")
+		path := conf["ns_path"]
+		if _, err = m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + path + `" )`); err != nil {
 			return nil, fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
 		}
 		logger.Debug("tdengine root table created", "table", tname)
@@ -278,16 +294,22 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 func (m *TDEngineBackend) getTablename(ctx context.Context) (string, error) {
 	ns, err := namespace.FromContext(ctx)
 	if err != nil && err == namespace.ErrNoNamespace {
+		if m.conf != nil && m.conf["ns_path"] != "" {
+			return m.database + `.` + namespace.RootNamespaceID + "_" + m.conf["ns_path"], nil
+		}
 		return m.database + `.` + namespace.RootNamespaceID, nil
 	} else if err != nil {
 		return "", fmt.Errorf("namespace in ctx error: %w", err)
 	}
 
+	if m.conf != nil && m.conf["ns_path"] != "" {
+		return m.database + `.` + tablename(ns) + "_" + m.conf["ns_path"], nil
+	}
 	return m.database + `.` + tablename(ns), nil
 }
 
 // Get is used to fetch an entry.
-func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry, error) {
+func (m *TDEngineBackend) GetWithDuration(ctx context.Context, key string, duration int64) (*physical.Entry, error) {
 	defer metrics.MeasureSince([]string{"tdengine", "get"}, time.Now())
 
 	m.permitPool.Acquire()
@@ -299,9 +321,15 @@ func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry,
 		return nil, err
 	}
 
-	statement := `SELECT v FROM ` + tname + ` WHERE k="` + key + `" ORDER BY ts DESC LIMIT 1`
-	var result []byte
-	err = m.db.QueryRowContext(ctx, statement).Scan(&result)
+	statement := `SELECT ts, v FROM ` + tname + ` WHERE k="` + key + `"`
+	if duration > 0 {
+		statement += ` AND ts > now`
+	}
+	statement += ` ORDER BY ts DESC LIMIT 1`
+
+	var ts time.Time
+	var value []byte
+	err = m.db.QueryRowContext(ctx, statement).Scan(&ts, &value)
 	if err == sql.ErrNoRows {
 		m.logger.Debug("tdengine get", "table", tname, "key", key, "record", "not found")
 		return nil, nil
@@ -309,23 +337,42 @@ func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry,
 		return nil, fmt.Errorf("failed to query %w", err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-
 	m.logger.Debug("tdengine get", "table", tname, "key", key)
+
+	bs, err := ts.MarshalBinary()
+	return &physical.Entry{
+		Key:       key,
+		Value:     value,
+		ValueHash: bs,
+	}, err
+}
+
+// Get is used to fetch an entry.
+func (m *TDEngineBackend) Get(ctx context.Context, key string) (*physical.Entry, error) {
+	entry, err := m.GetWithDuration(ctx, key, 0)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, nil
+	}
 
 	return &physical.Entry{
 		Key:   key,
-		Value: result,
+		Value: entry.Value,
 	}, nil
 }
 
 // Put is used to insert or update an entry.
-func (m *TDEngineBackend) Put(ctx context.Context, entry *physical.Entry) error {
+func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.Entry, d int64, patch int) error {
 	defer metrics.MeasureSince([]string{"tdengine", "put"}, time.Now())
+
+	if patch > 0 && d > 0 {
+		err := m.DeleteExpired(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to delete expired %w", err)
+		}
+	}
 
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
@@ -342,46 +389,36 @@ func (m *TDEngineBackend) Put(ctx context.Context, entry *physical.Entry) error 
 	}
 
 	key := entry.Key
-	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + key + `"`
-	rows, err := m.db.QueryContext(ctx, statement)
-	if err == sql.ErrNoRows {
-		statement := fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
-		_, err = m.db.ExecContext(ctx, statement)
-		m.logger.Debug("tdengine put", "table", tname, "key", key, "possible error", err)
-		return err
-	} else if err != nil {
-		return fmt.Errorf("failed to query %w", err)
-	}
-	defer rows.Close()
-
-	var arr []string
-	for rows.Next() {
-		var ts time.Time
-		err = rows.Scan(&ts)
-		if err != nil {
-			return fmt.Errorf("failed to scan ts %w", err)
+	var ts time.Time
+	err = m.db.QueryRowContext(ctx, `SELECT ts FROM `+tname+` WHERE k="`+key+`" ORDER BY ts DESC LIMIT 1`).Scan(&ts)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check existing %w", err)
+	} else if err != sql.ErrNoRows { // existing
+		if patch == 1 {
+			return nil
+		} else {
+			s := strings.Split(fmt.Sprintf("%s", ts), " ")
+			_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
+			if err != nil {
+				return fmt.Errorf("failed to delete %w", err)
+			}
 		}
-		arr = append(arr, fmt.Sprintf("%s", ts))
 	}
 
-	statement = fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
+	var statement string
+	if d > 0 {
+		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now+%d, '%s', "\x%x")`, tname, d, key, entry.Value)
+	} else {
+		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
+	}
 	_, err = m.db.ExecContext(ctx, statement)
-	if err != nil {
-		m.logger.Error("failed to insert", "table", tname, "error", err)
-		return fmt.Errorf("failed to insert %w", err)
-	}
+	m.logger.Debug("tdengine put", "table", tname, "key", key, "possible error", err)
+	return err
+}
 
-	for _, ts := range arr {
-		s := strings.Split(ts, " ")
-		_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
-		if err != nil {
-			m.logger.Error("failed to delete old", "statement", statement, "ts", ts, "error", err)
-			return fmt.Errorf("failed to delete %w in update", err)
-		}
-	}
-
-	m.logger.Debug("tdengine put", "table", tname, "key", key)
-	return nil
+// Put is used to insert or update an entry.
+func (m *TDEngineBackend) Put(ctx context.Context, entry *physical.Entry) error {
+	return m.AddWithDuration(ctx, entry, 0, 0)
 }
 
 // Delete is used to permanently delete an entry
@@ -405,7 +442,8 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + key + `"`
 	rows, err := m.db.QueryContext(ctx, statement)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("key %s not found", key)
+		m.logger.Debug("tdengine delete", "key not found", key)
+		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to query %w", err)
 	}
@@ -430,9 +468,28 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// DeleteAll is used to cleanup
-func (m *TDEngineBackend) DeleteAll(ctx context.Context) error {
-	defer metrics.MeasureSince([]string{"tdengine", "invalidate"}, time.Now())
+// DeleteExpired is used to delete all the expired entries.
+func (m *TDEngineBackend) DeleteExpired(ctx context.Context) error {
+	defer metrics.MeasureSince([]string{"tdengine", "expired"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.db.ExecContext(ctx, "DELETE FROM "+tname+" WHERE ts < now")
+	if err != nil {
+		m.logger.Debug("tdengine delete expired", "table", tname)
+	}
+	return err
+}
+
+// Flush is used to cleanup
+func (m *TDEngineBackend) Flush(ctx context.Context) error {
+	defer metrics.MeasureSince([]string{"tdengine", "flush"}, time.Now())
 
 	m.permitPool.Acquire()
 	defer m.permitPool.Release()
@@ -447,6 +504,45 @@ func (m *TDEngineBackend) DeleteAll(ctx context.Context) error {
 		m.logger.Debug("tdengine delete all", "table", tname)
 	}
 	return err
+}
+
+// Items lists all entries
+func (m *TDEngineBackend) Items(ctx context.Context) ([]*physical.Entry, error) {
+	defer metrics.MeasureSince([]string{"tdengine", "list"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	statement := `SELECT ts, k, v FROM ` + tname
+	rows, err := m.db.QueryContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to item", "table", tname, "statement", statement, "error", err)
+		return nil, fmt.Errorf("failed to item %w", err)
+	}
+	defer rows.Close()
+
+	var items []*physical.Entry
+	for rows.Next() {
+		var ts, key string
+		var value []byte
+		err = rows.Scan(&ts, &key, &value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan rows: %w", err)
+		}
+		items = append(items, &physical.Entry{
+			Key:       key,
+			Value:     value,
+			ValueHash: []byte(ts),
+		})
+	}
+
+	m.logger.Debug("tdengine item", "table", tname)
+	return items, nil
 }
 
 // List is used to list all the keys under a given

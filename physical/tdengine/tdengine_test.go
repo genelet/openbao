@@ -18,7 +18,7 @@ func backend() *TDEngineBackend {
 	if err != nil {
 		panic(err)
 	}
-	return bi.(*TDEngineBackend)
+	return bi
 }
 
 func TestTDEngine_Backend(t *testing.T) {

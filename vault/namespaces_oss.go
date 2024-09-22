@@ -334,7 +334,7 @@ func (ps *NamespaceStore) invalidate(ctx context.Context, path string) error {
 			return fmt.Errorf("namespace not found in context")
 		}
 		if path == "" || path == namespace.RootNamespaceID {
-			err = td.DeleteAll(ctx)
+			err = td.Flush(ctx)
 		} else {
 			err = ps.DeleteNamespace(ctx, path)
 		}
