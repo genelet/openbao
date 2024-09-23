@@ -133,7 +133,7 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBac
 	} else if !stableExist {
 		createSTable := conf["create_stable"]
 		if createSTable == "" {
-			createSTable = `CREATE STABLE IF NOT EXISTS ` + sTable + ` ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
+			createSTable = `CREATE STABLE IF NOT EXISTS ` + m.database + "." + sTable + ` ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
 		}
 		if _, err = db.Exec(createSTable); err != nil {
 			return nil, fmt.Errorf("failed to create tdengine stable %s: %w", sTable, err)
@@ -144,6 +144,9 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBac
 	tname, ok := conf["table"]
 	if !ok {
 		tname = tablename(namespace.RootNamespace)
+		if path := conf["ns_path"]; path != "" {
+			tname += "_" + path
+		}
 	}
 	tableExist, err := m.existingTable(tname)
 	if err != nil {
@@ -155,8 +158,10 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBac
 		}
 		id = strings.Trim(id, "/")
 		path := conf["ns_path"]
-		if _, err = m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + path + `" )`); err != nil {
-			return nil, fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
+		tname = strings.ReplaceAll(tname, "-", "")
+		statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + path + `" )`
+		if _, err = m.db.Exec(statement); err != nil {
+			return nil, fmt.Errorf("failed to create tdengine table %s: %w", statement, err)
 		}
 		logger.Debug("tdengine root table created", "table", tname)
 	}
@@ -170,7 +175,26 @@ func quote(s string) string {
 
 // tablename returns the table name for the current namespace.
 func tablename(ns *namespace.Namespace) string {
-	return quote(strings.ReplaceAll(ns.ID, "/", "_"))
+	return quote(strings.ReplaceAll(strings.ReplaceAll(ns.ID, "-", ""), "/", "_"))
+}
+
+// get table name from context namespace.
+func (m *TDEngineBackend) getTablename(ctx context.Context) (string, error) {
+	ns, err := namespace.FromContext(ctx)
+	if err != nil && err == namespace.ErrNoNamespace {
+		if m.conf != nil && m.conf["ns_path"] != "" {
+			return m.database + `.` + namespace.RootNamespaceID + "_" + m.conf["ns_path"], nil
+		}
+		return m.database + `.` + namespace.RootNamespaceID, nil
+	} else if err != nil {
+		return "", fmt.Errorf("namespace in ctx error: %w", err)
+	}
+
+	if m.conf != nil && m.conf["ns_path"] != "" {
+		path := strings.ReplaceAll(m.conf["ns_path"], "-", "")
+		return m.database + `.` + tablename(ns) + "_" + path, nil
+	}
+	return m.database + `.` + tablename(ns), nil
 }
 
 func (m *TDEngineBackend) existingChildren(tname string) (bool, error) {
@@ -226,6 +250,7 @@ func (m *TDEngineBackend) CreateIfNotExists(ctx context.Context, ns1 string) err
 	}
 
 	tname := parent + "_" + ns1
+	tname = strings.ReplaceAll(tname, "-", "")
 	id := ns0.ID + "/" + ns1
 	p := ns0.Path
 
@@ -254,6 +279,7 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 		return fmt.Errorf("invalid namespace path %s", ns1)
 	}
 	tname := parent + "_" + ns1
+	tname = strings.ReplaceAll(tname, "-", "")
 
 	tableExist, err := m.existingTable(tname)
 	if err != nil {
@@ -288,24 +314,6 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 
 	m.logger.Debug("tdengine table dropped", "table", tname)
 	return nil
-}
-
-// get table name from context namespace.
-func (m *TDEngineBackend) getTablename(ctx context.Context) (string, error) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil && err == namespace.ErrNoNamespace {
-		if m.conf != nil && m.conf["ns_path"] != "" {
-			return m.database + `.` + namespace.RootNamespaceID + "_" + m.conf["ns_path"], nil
-		}
-		return m.database + `.` + namespace.RootNamespaceID, nil
-	} else if err != nil {
-		return "", fmt.Errorf("namespace in ctx error: %w", err)
-	}
-
-	if m.conf != nil && m.conf["ns_path"] != "" {
-		return m.database + `.` + tablename(ns) + "_" + m.conf["ns_path"], nil
-	}
-	return m.database + `.` + tablename(ns), nil
 }
 
 // Get is used to fetch an entry.

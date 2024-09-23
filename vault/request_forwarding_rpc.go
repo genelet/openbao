@@ -5,6 +5,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -79,7 +80,11 @@ func (s *forwardedRequestRPCServer) Echo(ctx context.Context, in *EchoRequest) (
 		upgradeVersion: in.RaftUpgradeVersion,
 	}
 	if in.ClusterAddr != "" {
-		s.core.clusterPeerClusterAddrsCache.Set(in.ClusterAddr, incomingNodeConnectionInfo, 0)
+		bs, err := json.Marshal(incomingNodeConnectionInfo)
+		if err != nil {
+			return nil, err
+		}
+		s.core.clusterPeerClusterAddrsCache.Set(in.ClusterAddr, bs, 0)
 	}
 
 	if in.RaftAppliedIndex > 0 && len(in.RaftNodeID) > 0 && s.raftFollowerStates != nil {

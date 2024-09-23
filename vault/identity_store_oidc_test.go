@@ -17,9 +17,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/namespace"
+	gocache "github.com/openbao/openbao/physical/cache"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	gocache "github.com/patrickmn/go-cache"
+	// gocache "github.com/patrickmn/go-cache"
 )
 
 // TestOIDC_Path_OIDC_RoleNoKeyParameter tests that a role cannot be created
@@ -1147,8 +1148,15 @@ func TestOIDC_PeriodicFunc(t *testing.T) {
 				currentCycle = currentCycle + 1
 
 				// sleep until we are in the next cycle - where a next run will happen
+				// oss start
 				v, _, _ := c.identityStore.oidcCache.Get(noNamespace, "nextRun")
-				nextRun := v.(time.Time)
+				var nextRun time.Time
+				// nextRun := v.(time.Time)
+				err := nextRun.UnmarshalText(v)
+				if err != nil {
+					t.Fatalf("failed to unmarshal nextRun")
+				}
+				// oss end
 				now := time.Now()
 				diff := nextRun.Sub(now)
 				if now.Before(nextRun) {
@@ -1562,7 +1570,12 @@ func TestOIDC_isTargetNamespacedKey(t *testing.T) {
 }
 
 func TestOIDC_Flush(t *testing.T) {
-	c := newOIDCCache(gocache.NoExpiration, gocache.NoExpiration)
+	// oss start
+	c, err := newOIDCCache(nil, "root", "oidc", gocache.NoExpiration, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// oss end
 	ns := []*namespace.Namespace{
 		noNamespace, // ns[0] is nilNamespace
 		{ID: "ns1"},
@@ -1573,7 +1586,10 @@ func TestOIDC_Flush(t *testing.T) {
 	populateNs := func() {
 		for i := range ns {
 			for _, val := range []string{"keyA", "keyB", "keyC"} {
-				if err := c.SetDefault(ns[i], val, struct{}{}); err != nil {
+				// oss start
+				// if err := c.SetDefault(ns[i], val, struct{}{}); err != nil {
+				if err := c.SetDefault(ns[i], val, []byte{}); err != nil {
+					// oss end
 					t.Fatal(err)
 				}
 			}
@@ -1609,7 +1625,12 @@ func TestOIDC_Flush(t *testing.T) {
 	if err := c.Flush(ns[1]); err != nil {
 		t.Fatal(err)
 	}
-	items := c.c.Items()
+	// oss start
+	items, err := c.c.Items()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// oss end
 	verify(items, []*namespace.Namespace{ns[2]}, []*namespace.Namespace{ns[0], ns[1]})
 
 	// flushing nilNamespace should flush nilNamespace but not ns1 or ns2
@@ -1617,18 +1638,28 @@ func TestOIDC_Flush(t *testing.T) {
 	if err := c.Flush(ns[0]); err != nil {
 		t.Fatal(err)
 	}
-	items = c.c.Items()
+	// oss start
+	items, err = c.c.Items()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// oss end
 	verify(items, []*namespace.Namespace{ns[1], ns[2]}, []*namespace.Namespace{ns[0]})
 }
 
 func TestOIDC_CacheNamespaceNilCheck(t *testing.T) {
-	cache := newOIDCCache(gocache.NoExpiration, gocache.NoExpiration)
+	// oss start
+	cache, err := newOIDCCache(nil, "root", "oidc", gocache.NoExpiration, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// oss end
 
 	if _, _, err := cache.Get(nil, "foo"); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
-	if err := cache.SetDefault(nil, "foo", 42); err == nil {
+	if err := cache.SetDefault(nil, "foo", intToByteArray(42)); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
@@ -1653,7 +1684,13 @@ func TestOIDC_GetKeysCacheControlHeader(t *testing.T) {
 
 	// set nextRun
 	nextRun := time.Now().Add(24 * time.Hour)
-	if err = c.identityStore.oidcCache.SetDefault(noNamespace, "nextRun", nextRun); err != nil {
+	// oss start
+	bs, err := nextRun.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.identityStore.oidcCache.SetDefault(noNamespace, "nextRun", bs); err != nil {
+		// oss end
 		t.Fatal(err)
 	}
 
@@ -1670,7 +1707,10 @@ func TestOIDC_GetKeysCacheControlHeader(t *testing.T) {
 	// set jwksCacheControlMaxAge
 	durationSeconds := 60
 	jwksCacheControlMaxAge := time.Duration(durationSeconds) * time.Second
-	if err = c.identityStore.oidcCache.SetDefault(noNamespace, "jwksCacheControlMaxAge", jwksCacheControlMaxAge); err != nil {
+	// oss start
+	// if err = c.identityStore.oidcCache.SetDefault(noNamespace, "jwksCacheControlMaxAge", jwksCacheControlMaxAge); err != nil {
+	if err = c.identityStore.oidcCache.SetDefault(noNamespace, "jwksCacheControlMaxAge", intToByteArray(int64(jwksCacheControlMaxAge))); err != nil {
+		// oss end
 		t.Fatal(err)
 	}
 

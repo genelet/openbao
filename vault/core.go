@@ -45,6 +45,7 @@ import (
 	"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/osutil"
+	"github.com/openbao/openbao/physical/cache"
 	"github.com/openbao/openbao/physical/raft"
 	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/helper/certutil"
@@ -60,7 +61,6 @@ import (
 	"github.com/openbao/openbao/vault/quotas"
 	vaultseal "github.com/openbao/openbao/vault/seal"
 	"github.com/openbao/openbao/version"
-	"github.com/patrickmn/go-cache"
 	uberAtomic "go.uber.org/atomic"
 	"google.golang.org/grpc"
 )
@@ -893,6 +893,10 @@ func CreateCore(conf *CoreConfig) (*Core, error) {
 		}
 	}
 
+	cacheNew, err := cache.New(nil, "root", "core", 3*clusterHeartbeatInterval, conf.Logger)
+	if err != nil {
+		return nil, err
+	}
 	// Setup the core
 	c := &Core{
 		devToken:             conf.DevToken,
@@ -921,7 +925,7 @@ func CreateCore(conf *CoreConfig) (*Core, error) {
 		cachingDisabled:                conf.DisableCache,
 		clusterName:                    conf.ClusterName,
 		clusterNetworkLayer:            conf.ClusterNetworkLayer,
-		clusterPeerClusterAddrsCache:   cache.New(3*clusterHeartbeatInterval, time.Second),
+		clusterPeerClusterAddrsCache:   cacheNew,
 		rawEnabled:                     conf.EnableRaw,
 		introspectionEnabled:           conf.EnableIntrospection,
 		shutdownDoneCh:                 new(atomic.Value),
@@ -2438,7 +2442,11 @@ func (c *Core) postUnseal(ctx context.Context, ctxCancelFunc context.CancelFunc,
 	if api.ReadBaoVariable(EnvVaultDisableLocalAuthMountEntities) != "" {
 		c.logger.Warn("disabling entities for local auth mounts through env var", "env", EnvVaultDisableLocalAuthMountEntities)
 	}
-	c.loginMFABackend.usedCodes = cache.New(0, 30*time.Second)
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	c.loginMFABackend.usedCodes, err = cache.New(nil, ns.ID, "mfa", 0, c.Logger())
 	c.logger.Info("post-unseal setup complete")
 	return nil
 }
@@ -3573,10 +3581,22 @@ type PeerNode struct {
 }
 
 // GetHAPeerNodesCached returns the nodes that've sent us Echo requests recently.
-func (c *Core) GetHAPeerNodesCached() []PeerNode {
+// oss start
+// func (c *Core) GetHAPeerNodesCached() []PeerNode {
+func (c *Core) GetHAPeerNodesCached() ([]PeerNode, error) {
 	var nodes []PeerNode
-	for itemClusterAddr, item := range c.clusterPeerClusterAddrsCache.Items() {
-		info := item.Object.(nodeHAConnectionInfo)
+	// for itemClusterAddr, item := range c.clusterPeerClusterAddrsCache.Items() {
+	//   info := item.Object.(nodeHAConnectionInfo)
+	items, err := c.clusterPeerClusterAddrsCache.Items()
+	if err != nil {
+		return nil, err
+	}
+	for itemClusterAddr, item := range items {
+		info := new(nodeHAConnectionInfo)
+		if err := json.Unmarshal(item.Object, info); err != nil {
+			return nil, err
+		}
+		// oss end
 		nodes = append(nodes, PeerNode{
 			Hostname:       info.nodeInfo.Hostname,
 			APIAddress:     info.nodeInfo.ApiAddr,
@@ -3586,7 +3606,7 @@ func (c *Core) GetHAPeerNodesCached() []PeerNode {
 			UpgradeVersion: info.upgradeVersion,
 		})
 	}
-	return nodes
+	return nodes, nil
 }
 
 func (c *Core) CheckPluginPerms(pluginName string) (err error) {

@@ -17,6 +17,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	log "github.com/hashicorp/go-hclog"
@@ -25,6 +26,11 @@ import (
 	"github.com/openbao/openbao/sdk/v2/physical"
 
 	_ "github.com/taosdata/driver-go/v3/taosRestful"
+)
+
+const (
+	NoExpiration      = -1
+	DefaultExpiration = 0
 )
 
 // Cache is a physical backend that stores data
@@ -62,12 +68,15 @@ func New(conf map[string]string, nsID, name string, defaultExpiration time.Durat
 	if create, ok := conf["create_stable_cache"]; ok {
 		newconf["create_stable"] = create
 	} else {
-		newconf["create_stable"] = `CREATE STABLE IF NOT EXISTS supercache ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
+		newconf["create_stable"] = `CREATE STABLE IF NOT EXISTS opencache.supercache ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
 	}
 
 	newconf["ns_id"] = nsID
 	newconf["ns_path"] = name
 	newconf["table"] = nsID + "_" + name
+	if newconf["connection_url"] == "" {
+		newconf["connection_url"] = "root:taosdata@http(localhost:6041)/"
+	}
 
 	m, err := tdengine.NewTDEngineBackend(newconf, logger)
 	if err != nil {
@@ -122,7 +131,7 @@ func (m *Cache) SetDefault(k string, x []byte) error {
 	return m.Set(k, x, 0)
 }
 
-func (m *Cache) get(k string) (*physical.Entry, bool) {
+func (m *Cache) get(k string) (*physical.Entry, error) {
 	i := int64(0)
 	if m.defaultExpiration > 0 {
 		i = m.defaultExpiration.Nanoseconds()
@@ -131,45 +140,44 @@ func (m *Cache) get(k string) (*physical.Entry, bool) {
 	ctx := m.Context()
 	entry, err := m.td.GetWithDuration(ctx, k, i)
 	if err != nil {
-		m.logger.Error("failed to get key", "key", k, "error", err)
-		return nil, false
+		return nil, err
+	}
+
+	return entry, nil
+}
+
+func (m *Cache) Get(k string) ([]byte, error) {
+	entry, err := m.get(k)
+	if err != nil {
+		return nil, err
 	}
 	if entry == nil {
-		return nil, false
+		return nil, nil
 	}
 
-	return entry, true
+	return entry.Value, nil
 }
 
-func (m *Cache) Get(k string) ([]byte, bool) {
-	entry, ok := m.get(k)
-	if !ok {
-		return nil, false
+func (m *Cache) GetWithExpiration(k string) ([]byte, time.Time, error) {
+	entry, err := m.get(k)
+	if err != nil {
+		return nil, time.Time{}, err
 	}
-
-	return entry.Value, true
-}
-
-func (m *Cache) GetWithExpiration(k string) ([]byte, time.Time, bool) {
-	entry, ok := m.get(k)
-	if !ok {
-		return nil, time.Time{}, false
+	if entry == nil {
+		return nil, time.Time{}, nil
 	}
 
 	var expiration time.Time
-	if err := expiration.UnmarshalBinary(entry.ValueHash); err != nil {
-		m.logger.Error("failed to unmarshal expiration", "key", k, "error", err)
-		return nil, time.Time{}, false
+	if entry.ValueHash != nil {
+		err = expiration.UnmarshalBinary(entry.ValueHash)
 	}
 
-	return entry.Value, expiration, true
+	return entry.Value, expiration, fmt.Errorf("expiration not available: %v", err.Error())
 }
 
-func (m *Cache) Delete(k string) {
+func (m *Cache) Delete(k string) error {
 	ctx := m.Context()
-	if err := m.td.Delete(ctx, k); err != nil {
-		m.logger.Error("failed to delete key", "key", k, "error", err)
-	}
+	return m.td.Delete(ctx, k)
 }
 
 type Item struct {
@@ -177,20 +185,18 @@ type Item struct {
 	Expiration int64
 }
 
-func (m *Cache) Items() map[string]Item {
+func (m *Cache) Items() (map[string]Item, error) {
 	ctx := m.Context()
 	entries, err := m.td.Items(ctx)
 	if err != nil {
-		m.logger.Error("failed to list keys", "error", err)
-		return nil
+		return nil, err
 	}
 
 	items := make(map[string]Item, len(entries))
 	for _, entry := range entries {
 		var expiration time.Time
 		if err := expiration.UnmarshalBinary(entry.ValueHash); err != nil {
-			m.logger.Error("failed to unmarshal expiration", "key", entry.Key, "time", string(entry.ValueHash), "error", err)
-			return nil
+			return nil, err
 		}
 		items[entry.Key] = Item{
 			Object:     entry.Value,
@@ -198,5 +204,5 @@ func (m *Cache) Items() map[string]Item {
 		}
 	}
 
-	return items
+	return items, nil
 }

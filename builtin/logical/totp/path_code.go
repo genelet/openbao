@@ -104,10 +104,19 @@ func (b *backend) pathValidateCode(ctx context.Context, req *logical.Request, da
 
 	usedName := fmt.Sprintf("%s_%s", name, code)
 
-	_, ok := b.usedCodes.Get(usedName)
-	if ok {
+	// oss start
+	// _, ok := b.usedCodes.Get(usedName)
+	// if ok {
+	//	return logical.ErrorResponse("code already used; wait until the next time period"), nil
+	// }
+	bs, err := b.usedCodes.Get(usedName)
+	if err == nil && bs != nil {
 		return logical.ErrorResponse("code already used; wait until the next time period"), nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("error checking code in used cache: %w", err)
+	}
+	// oss end
 
 	valid, err := totplib.ValidateCustom(code, key.Key, time.Now(), totplib.ValidateOpts{
 		Period:    key.Period,

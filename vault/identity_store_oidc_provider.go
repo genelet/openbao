@@ -1871,7 +1871,14 @@ func (i *IdentityStore) pathOIDCAuthorize(ctx context.Context, req *logical.Requ
 	}
 
 	// Cache the authorization code for a subsequent token exchange
-	if err := i.oidcAuthCodeCache.SetDefault(ns, code, authCodeEntry); err != nil {
+	// oss start
+	// if err := i.oidcAuthCodeCache.SetDefault(ns, code, authCodeEntry); err != nil {
+	bs, err := json.Marshal(authCodeEntry)
+	if err != nil {
+		return authResponse("", state, ErrAuthServerError, err.Error())
+	}
+	if err := i.oidcAuthCodeCache.SetDefault(ns, code, bs); err != nil {
+		// oss end
 		return authResponse("", state, ErrAuthServerError, err.Error())
 	}
 
@@ -2005,9 +2012,14 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	if !ok {
 		return tokenResponse(nil, ErrTokenInvalidGrant, "authorization grant is invalid or expired")
 	}
-	authCodeEntry, ok := authCodeEntryRaw.(*authCodeCacheEntry)
-	if !ok {
-		return tokenResponse(nil, ErrTokenServerError, "authorization grant is invalid or expired")
+	// oss start
+	// authCodeEntry, ok := authCodeEntryRaw.(*authCodeCacheEntry)
+	// if !ok {
+	//	return tokenResponse(nil, ErrTokenServerError, "authorization grant is invalid or expired")
+	// }
+	authCodeEntry := &authCodeCacheEntry{}
+	if err := json.Unmarshal(authCodeEntryRaw, authCodeEntry); err != nil {
+		return tokenResponse(nil, ErrTokenServerError, err.Error())
 	}
 
 	// Ensure the authorization code was issued to the authenticated client

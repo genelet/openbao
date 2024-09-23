@@ -6,11 +6,16 @@ package totp
 import (
 	"context"
 	"strings"
-	"time"
+
+	//"time"
 
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	cache "github.com/patrickmn/go-cache"
+
+	// oss start
+	// cache "github.com/patrickmn/go-cache"
+	"github.com/openbao/openbao/physical/cache"
+	// oss end
 )
 
 const operationPrefixTOTP = "totp"
@@ -44,7 +49,14 @@ func Backend() *backend {
 		BackendType: logical.TypeLogical,
 	}
 
-	b.usedCodes = cache.New(0, 30*time.Second)
+	// oss start
+	// b.usedCodes = cache.New(0, 30*time.Second)
+	var err error
+	b.usedCodes, err = cache.New(nil, "root", "totp", 0, nil)
+	if err != nil {
+		panic(err)
+	}
+	// oss end
 
 	return &b
 }

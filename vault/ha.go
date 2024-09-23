@@ -97,7 +97,14 @@ func (c *Core) getHAMembers() ([]HAStatusNode, error) {
 
 	nodes := []HAStatusNode{leader}
 
-	for _, peerNode := range c.GetHAPeerNodesCached() {
+	// oss start
+	peers, err := c.GetHAPeerNodesCached()
+	if err != nil {
+		return nil, err
+	}
+	// for _, peerNode := range c.GetHAPeerNodesCached() {
+	for _, peerNode := range peers {
+		// oss end
 		lastEcho := peerNode.LastEcho
 		nodes = append(nodes, HAStatusNode{
 			Hostname:       peerNode.Hostname,
