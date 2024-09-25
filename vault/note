@@ -1,6 +1,0 @@
-peter@peter-MINI-S:~/openbao/vault (native)$ date
-Sun Sep 22 08:41:49 AM PDT 2024
-peter@peter-MINI-S:~/openbao/vault (native)$ go test -run TestOIDC > log 
-date
-peter@peter-MINI-S:~/openbao/vault (native)$ date
-Sun Sep 22 08:50:12 AM PDT 2024

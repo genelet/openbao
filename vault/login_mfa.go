@@ -16,7 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unsafe"
 
 	duoapi "github.com/duosecurity/duo_api_golang"
 	"github.com/duosecurity/duo_api_golang/authapi"
@@ -34,10 +33,7 @@ import (
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/identity/mfa"
 	"github.com/openbao/openbao/helper/namespace"
-
-	// oss start
 	"github.com/openbao/openbao/physical/cache"
-	// oss end
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/identitytpl"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -2329,28 +2325,6 @@ func (c *Core) validatePingID(ctx context.Context, mConfig *mfa.Config, username
 	return nil
 }
 
-// oss start
-func intToByteArray(num int64) []byte {
-	size := int(unsafe.Sizeof(num))
-	arr := make([]byte, size)
-	for i := 0; i < size; i++ {
-		byt := *(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(&num)) + uintptr(i)))
-		arr[i] = byt
-	}
-	return arr
-}
-
-func byteArrayToInt(arr []byte) int64 {
-	val := int64(0)
-	size := len(arr)
-	for i := 0; i < size; i++ {
-		*(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(&val)) + uintptr(i))) = arr[i]
-	}
-	return val
-}
-
-// oss end
-
 func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMethodSecret *mfa.Secret, configID, entityID string, usedCodes *cache.Cache, maximumValidationAttempts uint32) error {
 	if mfaFactors == nil || mfaFactors.passcode == "" {
 		return fmt.Errorf("MFA credentials not supplied")
@@ -2365,15 +2339,44 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 	usedName := fmt.Sprintf("%s_%s", configID, passcode)
 
 	// oss start
-	// _, ok := usedCodes.Get(usedName)
-	// if ok {
-	//	return fmt.Errorf("code already used; new code is available in %v seconds", totpSecret.Period)
-	// }
-	_, err := usedCodes.Get(usedName)
-	if err == nil {
-		return err
+	/*
+	   _, ok := usedCodes.Get(usedName)
+	   if ok {
+	       return fmt.Errorf("code already used; new code is available in %v seconds", totpSecret.Period)
+	   }
+
+	   // The duration in which a passcode is stored in cache to enforce
+	   // rate limit on failed totp passcode validation
+	   passcodeTTL := time.Duration(int64(time.Second) * int64(totpSecret.Period))
+
+	   // Enforcing rate limit per MethodID per EntityID
+	   rateLimitID := fmt.Sprintf("%s_%s", configID, entityID)
+
+	   numAttempts, _ := usedCodes.Get(rateLimitID)
+	   if numAttempts == nil {
+	       usedCodes.Set(rateLimitID, uint32(1), passcodeTTL)
+	   } else {
+	       num, ok := numAttempts.(uint32)
+	       if !ok {
+	           return fmt.Errorf("invalid counter type returned in TOTP usedCode cache")
+	       }
+	       if num == maximumValidationAttempts {
+	           return fmt.Errorf("maximum TOTP validation attempts %d exceeded the allowed attempts %d. Please try again in %v seconds", num+1, maximumValidationAttempts, passcodeTTL)
+	       }
+	       err := usedCodes.Increment(rateLimitID, 1)
+	       if err != nil {
+	           return fmt.Errorf("failed to increment the TOTP code counter")
+	       }
+	   }
+	*/
+
+	usedValue, err := usedCodes.GetWithExpiration(usedName, nil)
+	if err != nil {
+		return fmt.Errorf("error fetching code from used cache: %w", err)
 	}
-	// oss end
+	if !usedValue.IsZero() {
+		return fmt.Errorf("code already used; new code is available in %v seconds", totpSecret.Period)
+	}
 
 	// The duration in which a passcode is stored in cache to enforce
 	// rate limit on failed totp passcode validation
@@ -2382,33 +2385,20 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 	// Enforcing rate limit per MethodID per EntityID
 	rateLimitID := fmt.Sprintf("%s_%s", configID, entityID)
 
-	numAttempts, _ := usedCodes.Get(rateLimitID)
-	if numAttempts == nil {
-		// oss start
-		/*
-			usedCodes.Set(rateLimitID, uint32(1), passcodeTTL)
-			} else {
-				num, ok := numAttempts.(uint32)
-				if !ok {
-					return fmt.Errorf("invalid counter type returned in TOTP usedCode cache")
-				}
-				if num == maximumValidationAttempts {
-					return fmt.Errorf("maximum TOTP validation attempts %d exceeded the allowed attempts %d. Please try again in %v seconds", num+1, maximumValidationAttempts, passcodeTTL)
-				}
-				err := usedCodes.Increment(rateLimitID, 1)
-		*/
-		usedCodes.Set(rateLimitID, intToByteArray(1), passcodeTTL)
+	var numAttempts uint32
+	err = usedCodes.Get(rateLimitID, &numAttempts)
+	if err != nil {
+		return fmt.Errorf("error fetching TOTP code counter: %w", err)
+	}
+	if numAttempts == 0 {
+		usedCodes.Set(rateLimitID, uint32(1), passcodeTTL)
 	} else {
-		num := byteArrayToInt(numAttempts)
-		if uint32(num) == maximumValidationAttempts {
-			return fmt.Errorf("maximum TOTP validation attempts %d exceeded the allowed attempts %d. Please try again in %v seconds", num+1, maximumValidationAttempts, passcodeTTL)
-		}
-		err := usedCodes.Set(rateLimitID, intToByteArray(num+1), passcodeTTL)
-		// oss end
+		err := usedCodes.Set(rateLimitID, numAttempts+1, passcodeTTL)
 		if err != nil {
 			return fmt.Errorf("failed to increment the TOTP code counter")
 		}
 	}
+	// oss end
 
 	key, err := c.fetchTOTPKey(ctx, configID, entityID)
 	if err != nil {
@@ -2440,7 +2430,10 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 	validityPeriod := time.Duration(int64(time.Second) * int64(totpSecret.Period) * int64(2+totpSecret.Skew))
 
 	// Adding the used code to the cache
+	// oss start
+	// err = usedCodes.Add(usedName, nil, validityPeriod)
 	err = usedCodes.Add(usedName, nil, validityPeriod)
+	// oss end
 	if err != nil {
 		return fmt.Errorf("error adding code to used cache: %w", err)
 	}

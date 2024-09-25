@@ -107,14 +107,12 @@ func (b *backend) pathValidateCode(ctx context.Context, req *logical.Request, da
 	// oss start
 	// _, ok := b.usedCodes.Get(usedName)
 	// if ok {
-	//	return logical.ErrorResponse("code already used; wait until the next time period"), nil
-	// }
-	bs, err := b.usedCodes.Get(usedName)
-	if err == nil && bs != nil {
-		return logical.ErrorResponse("code already used; wait until the next time period"), nil
-	}
+	t, err := b.usedCodes.GetWithExpiration(usedName, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error checking code in used cache: %w", err)
+		return logical.ErrorResponse("error checking if code is used"), err
+	}
+	if !t.IsZero() {
+		return logical.ErrorResponse("code already used; wait until the next time period"), nil
 	}
 	// oss end
 

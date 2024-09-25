@@ -1,5 +1,5 @@
 /*
-CREATE DATABASE openbao PRECISION 'ns' KEEP 3650 DURATION 10 BUFFER 16;
+CREATE DATABASE opencache PRECISION 'ns' KEEP 3650 DURATION 10 BUFFER 16;
 
 USE opencache;
 
@@ -9,7 +9,7 @@ CREATE STABLE supercache  (
 	v  VARBINARY(60000)
 ) TAGS (
     NamespaceID VARCHAR(1024),
-    Name VARCHAR(64)
+    NamespacePath VARCHAR(64)
 );
 */
 
@@ -17,10 +17,12 @@ package cache
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"reflect"
 	"time"
+	"unsafe"
 
-	log "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -39,10 +41,10 @@ type Cache struct {
 	defaultExpiration time.Duration
 	nsID, name        string
 	td                *tdengine.TDEngineBackend
-	logger            log.Logger
+	logger            hclog.Logger
 }
 
-func New(conf map[string]string, nsID, name string, defaultExpiration time.Duration, logger log.Logger) (*Cache, error) {
+func New(conf map[string]string, nsID, name string, defaultExpiration time.Duration, logger hclog.Logger) (*Cache, error) {
 	if conf == nil {
 		conf = make(map[string]string)
 	}
@@ -99,7 +101,104 @@ func (m *Cache) Context() context.Context {
 	})
 }
 
-func (m *Cache) Add(k string, x []byte, d time.Duration) error {
+func intToByteArray(num int64) []byte {
+	size := int(unsafe.Sizeof(num))
+	arr := make([]byte, size)
+	for i := 0; i < size; i++ {
+		byt := *(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(&num)) + uintptr(i)))
+		arr[i] = byt
+	}
+	return arr
+}
+
+func byteArrayToInt(arr []byte) int64 {
+	val := int64(0)
+	size := len(arr)
+	for i := 0; i < size; i++ {
+		*(*uint8)(unsafe.Pointer(uintptr(unsafe.Pointer(&val)) + uintptr(i))) = arr[i]
+	}
+	return val
+}
+
+func interfaceToBytes(x interface{}) ([]byte, error) {
+	if x == nil {
+		return []byte{}, nil
+	}
+
+	switch v := x.(type) {
+	case int:
+		return intToByteArray(int64(v)), nil
+	case int8:
+		return intToByteArray(int64(v)), nil
+	case int16:
+		return intToByteArray(int64(v)), nil
+	case int32:
+		return intToByteArray(int64(v)), nil
+	case int64:
+		return intToByteArray(v), nil
+	case uint:
+		return intToByteArray(int64(v)), nil
+	case uint8:
+		return intToByteArray(int64(v)), nil
+	case uint16:
+		return intToByteArray(int64(v)), nil
+	case uint32:
+		return intToByteArray(int64(v)), nil
+	case time.Time:
+		return v.MarshalBinary()
+	case time.Duration:
+		return intToByteArray(int64(v)), nil
+	case []byte:
+		return v, nil
+	case string:
+		return []byte(v), nil
+	default:
+	}
+
+	return json.Marshal(x)
+}
+
+func bytesToInterface(b []byte, x interface{}) error {
+	if x == nil || len(b) == 0 {
+		return nil
+	}
+
+	var err error
+	switch v := x.(type) {
+	case *int:
+		*v = int(byteArrayToInt(b))
+	case *int8:
+		*v = int8(byteArrayToInt(b))
+	case *int16:
+		*v = int16(byteArrayToInt(b))
+	case *int32:
+		*v = int32(byteArrayToInt(b))
+	case *int64:
+		*v = byteArrayToInt(b)
+	case *uint:
+		*v = uint(byteArrayToInt(b))
+	case *uint8:
+		*v = uint8(byteArrayToInt(b))
+	case *uint16:
+		*v = uint16(byteArrayToInt(b))
+	case *uint32:
+		*v = uint32(byteArrayToInt(b))
+	case *time.Time:
+		err = (*v).UnmarshalBinary(b)
+	case *time.Duration:
+		*v = time.Duration(byteArrayToInt(b))
+	case *[]byte:
+		*v = b
+	case *string:
+		*v = string(b)
+	default:
+		err = json.Unmarshal(b, x)
+	}
+
+	return err
+}
+
+func (m *Cache) AddContext(ctx context.Context, k string, x interface{}, d time.Duration) error {
 	if d == 0 {
 		d = m.defaultExpiration
 	}
@@ -108,12 +207,19 @@ func (m *Cache) Add(k string, x []byte, d time.Duration) error {
 		i = d.Nanoseconds()
 	}
 
-	ctx := m.Context()
-	entry := &physical.Entry{Key: k, Value: x}
+	bs, err := interfaceToBytes(x)
+	if err != nil {
+		return err
+	}
+	entry := &physical.Entry{Key: k, Value: bs}
 	return m.td.AddWithDuration(ctx, entry, i, 1)
 }
 
-func (m *Cache) Set(k string, x []byte, d time.Duration) error {
+func (m *Cache) Add(k string, x interface{}, d time.Duration) error {
+	return m.AddContext(m.Context(), k, x, d)
+}
+
+func (m *Cache) SetContext(ctx context.Context, k string, x interface{}, d time.Duration) error {
 	if d == 0 {
 		d = m.defaultExpiration
 	}
@@ -122,22 +228,32 @@ func (m *Cache) Set(k string, x []byte, d time.Duration) error {
 		i = d.Nanoseconds()
 	}
 
-	ctx := m.Context()
-	entry := &physical.Entry{Key: k, Value: x}
+	bs, err := interfaceToBytes(x)
+	if err != nil {
+		return err
+	}
+	entry := &physical.Entry{Key: k, Value: bs}
 	return m.td.AddWithDuration(ctx, entry, i, 2)
 }
 
-func (m *Cache) SetDefault(k string, x []byte) error {
+func (m *Cache) Set(k string, x interface{}, d time.Duration) error {
+	return m.SetContext(m.Context(), k, x, d)
+}
+
+func (m *Cache) SetDefaultContext(ctx context.Context, k string, x interface{}) error {
+	return m.SetContext(ctx, k, x, 0)
+}
+
+func (m *Cache) SetDefault(k string, x interface{}) error {
 	return m.Set(k, x, 0)
 }
 
-func (m *Cache) get(k string) (*physical.Entry, error) {
+func (m *Cache) getContext(ctx context.Context, k string) (*physical.Entry, error) {
 	i := int64(0)
 	if m.defaultExpiration > 0 {
 		i = m.defaultExpiration.Nanoseconds()
 	}
 
-	ctx := m.Context()
 	entry, err := m.td.GetWithDuration(ctx, k, i)
 	if err != nil {
 		return nil, err
@@ -146,62 +262,106 @@ func (m *Cache) get(k string) (*physical.Entry, error) {
 	return entry, nil
 }
 
-func (m *Cache) Get(k string) ([]byte, error) {
-	entry, err := m.get(k)
+func (m *Cache) GetContext(ctx context.Context, k string, x interface{}) error {
+	entry, err := m.getContext(ctx, k)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if entry == nil {
-		return nil, nil
+		return nil
 	}
 
-	return entry.Value, nil
+	return bytesToInterface(entry.Value, x)
 }
 
-func (m *Cache) GetWithExpiration(k string) ([]byte, time.Time, error) {
-	entry, err := m.get(k)
+func (m *Cache) Get(k string, x interface{}) error {
+	return m.GetContext(m.Context(), k, x)
+}
+
+func (m *Cache) GetWithExpirationContext(ctx context.Context, k string, x interface{}) (time.Time, error) {
+	entry, err := m.getContext(ctx, k)
 	if err != nil {
-		return nil, time.Time{}, err
+		return time.Time{}, err
 	}
 	if entry == nil {
-		return nil, time.Time{}, nil
+		return time.Time{}, nil
 	}
 
 	var expiration time.Time
 	if entry.ValueHash != nil {
-		err = expiration.UnmarshalBinary(entry.ValueHash)
+		if err := bytesToInterface(entry.ValueHash, &expiration); err != nil {
+			return expiration, err
+		}
 	}
 
-	return entry.Value, expiration, fmt.Errorf("expiration not available: %v", err.Error())
+	err = bytesToInterface(entry.Value, x)
+	return expiration, err
 }
 
-func (m *Cache) Delete(k string) error {
-	ctx := m.Context()
+func (m *Cache) GetWithExpiration(k string, x interface{}) (time.Time, error) {
+	return m.GetWithExpirationContext(m.Context(), k, x)
+}
+
+func (m *Cache) DeleteContext(ctx context.Context, k string) error {
 	return m.td.Delete(ctx, k)
 }
 
+func (m *Cache) Delete(k string) error {
+	return m.DeleteContext(m.Context(), k)
+}
+
 type Item struct {
-	Object     []byte
+	Object     interface{}
 	Expiration int64
 }
 
-func (m *Cache) Items() (map[string]Item, error) {
-	ctx := m.Context()
+func (m *Cache) FlushContext(ctx context.Context) error {
+	return m.td.Flush(ctx)
+}
+
+func (m *Cache) Flush() error {
+	return m.FlushContext(m.Context())
+}
+
+func (m *Cache) ItemsContext(ctx context.Context, object interface{}) (map[string]Item, error) {
 	entries, err := m.td.Items(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if len(entries) == 0 {
+		return nil, nil
+	}
 
-	items := make(map[string]Item, len(entries))
+	return entriesToItems(entries, object)
+}
+
+func (m *Cache) Items(object interface{}) (map[string]Item, error) {
+	return m.ItemsContext(m.Context(), object)
+}
+
+func entriesToItems(entries []*physical.Entry, object interface{}) (map[string]Item, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	items := make(map[string]Item)
 	for _, entry := range entries {
-		var expiration time.Time
-		if err := expiration.UnmarshalBinary(entry.ValueHash); err != nil {
+		var nano int64
+		if entry.ValueHash != nil {
+			var expiration time.Time
+			if err := bytesToInterface(entry.ValueHash, &expiration); err != nil {
+				return nil, err
+			} else {
+				nano = expiration.UnixNano()
+			}
+		}
+		if err := bytesToInterface(entry.Value, object); err != nil {
 			return nil, err
 		}
-		items[entry.Key] = Item{
-			Object:     entry.Value,
-			Expiration: expiration.UnixNano(),
-		}
+		v := reflect.ValueOf(object)
+		tmp := reflect.New(reflect.TypeOf(object))
+		tmp.Elem().Set(v)
+		items[entry.Key] = Item{Object: tmp.Elem().Elem().Interface(), Expiration: nano}
 	}
 
 	return items, nil

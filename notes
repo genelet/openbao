@@ -1,0 +1,5 @@
+without TestOIDC_PeriodicFunc, TestOIDC_isTargetNamespacedKey, TestOIDC_Flush
+
+original: 18s
+with patrick cache: 8min
+with dengine cache: 9min

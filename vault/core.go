@@ -3587,16 +3587,13 @@ func (c *Core) GetHAPeerNodesCached() ([]PeerNode, error) {
 	var nodes []PeerNode
 	// for itemClusterAddr, item := range c.clusterPeerClusterAddrsCache.Items() {
 	//   info := item.Object.(nodeHAConnectionInfo)
-	items, err := c.clusterPeerClusterAddrsCache.Items()
+	items, err := c.clusterPeerClusterAddrsCache.Items(new(nodeHAConnectionInfo))
 	if err != nil {
 		return nil, err
 	}
 	for itemClusterAddr, item := range items {
-		info := new(nodeHAConnectionInfo)
-		if err := json.Unmarshal(item.Object, info); err != nil {
-			return nil, err
-		}
 		// oss end
+		info := item.Object.(nodeHAConnectionInfo)
 		nodes = append(nodes, PeerNode{
 			Hostname:       info.nodeInfo.Hostname,
 			APIAddress:     info.nodeInfo.ApiAddr,

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	metrics "github.com/armon/go-metrics"
+	"github.com/hashicorp/go-hclog"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/api/v2"
@@ -101,6 +102,10 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBac
 	sTable := conf["stable"]
 	if sTable == "" {
 		sTable = "superbao"
+	}
+
+	if logger == nil {
+		logger = hclog.Default()
 	}
 
 	// Setup the backend.
@@ -342,6 +347,7 @@ func (m *TDEngineBackend) GetWithDuration(ctx context.Context, key string, durat
 		m.logger.Debug("tdengine get", "table", tname, "key", key, "record", "not found")
 		return nil, nil
 	} else if err != nil {
+		m.logger.Error("failed to query", "table", tname, "key", key, "error", err)
 		return nil, fmt.Errorf("failed to query %w", err)
 	}
 
@@ -400,6 +406,7 @@ func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.E
 	var ts time.Time
 	err = m.db.QueryRowContext(ctx, `SELECT ts FROM `+tname+` WHERE k="`+key+`" ORDER BY ts DESC LIMIT 1`).Scan(&ts)
 	if err != nil && err != sql.ErrNoRows {
+		m.logger.Error("failed to check existing", "table", tname, "key", key, "error", err)
 		return fmt.Errorf("failed to check existing %w", err)
 	} else if err != sql.ErrNoRows { // existing
 		if patch == 1 {
@@ -408,6 +415,7 @@ func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.E
 			s := strings.Split(fmt.Sprintf("%s", ts), " ")
 			_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
 			if err != nil {
+				m.logger.Error("failed to delete", "table", tname, "key", key, "error", err)
 				return fmt.Errorf("failed to delete %w", err)
 			}
 		}
@@ -415,13 +423,19 @@ func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.E
 
 	var statement string
 	if d > 0 {
-		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now+%d, '%s', "\x%x")`, tname, d, key, entry.Value)
+		nano := time.Now().UnixNano()
+		statement = fmt.Sprintf(`INSERT INTO %s VALUES (%d, '%s', "\x%x")`, tname, nano+d, key, entry.Value)
 	} else {
 		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
 	}
 	_, err = m.db.ExecContext(ctx, statement)
-	m.logger.Debug("tdengine put", "table", tname, "key", key, "possible error", err)
-	return err
+	if err != nil {
+		m.logger.Error("tdengine failed to put", "key", key, "error", err)
+		return fmt.Errorf("failed to put %w", err)
+	}
+	m.logger.Debug("tdengine put", "table", tname, "key", key)
+
+	return nil
 }
 
 // Put is used to insert or update an entry.
