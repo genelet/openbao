@@ -173,6 +173,8 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	// prepend namespace
 	prefix = mountEntry.Namespace().Path + prefix
 
+	ns := mountEntry.Namespace()
+	r.logger.Trace("77777777 Mount", "ns", ns, "type", mountEntry.Type, "nsID", mountEntry.NamespaceID, "prefix", prefix, "radix", fmt.Sprintf("%v", r.root.ToMap()))
 	// Check if this is a nested mount
 	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
 		return fmt.Errorf("cannot mount under existing mount %q", existing)

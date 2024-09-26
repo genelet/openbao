@@ -125,12 +125,14 @@ func handleSysUnseal(core *vault.Core) http.Handler {
 			}
 		}
 
+		core.Logger().Trace("1000000001 start unseal", "key", string(key))
 		// Attempt the unseal.  If migrate was specified, the key should correspond
 		// to the old seal.
 		if req.Migrate {
 			_, err = core.UnsealMigrate(key)
 		} else {
 			_, err = core.Unseal(key)
+			core.Logger().Trace("1000000004 end unseal")
 		}
 		if err != nil {
 			switch {
@@ -171,6 +173,7 @@ func handleSysSealStatusRaw(core *vault.Core, w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	core.Logger().Trace("1000000005 get seal status and response", "status", status)
 	respondOk(w, status)
 }
 

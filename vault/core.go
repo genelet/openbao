@@ -1051,6 +1051,7 @@ func NewCore(conf *CoreConfig) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.logger.Trace("000001000001 - NewCore - coreInit - end", "mounts", c.mounts, "auth", c.auth, "audit", c.audit, "router", c.router)
 
 	// Construct a new AES-GCM barrier
 	c.barrier, err = NewAESGCMBarrier(c.physical)
@@ -1495,6 +1496,7 @@ func (c *Core) unsealFragment(key []byte, migrate bool) error {
 	if err != nil {
 		return err
 	}
+	c.logger.Trace("100000000002 unseal key to master key pre unseal", "masterKey", string(masterKey))
 	return c.unsealInternal(ctx, masterKey)
 }
 
@@ -1820,11 +1822,13 @@ func (c *Core) migrateSeal(ctx context.Context) error {
 // unsealInternal takes in the master key and attempts to unseal the barrier.
 // N.B.: This must be called with the state write lock held.
 func (c *Core) unsealInternal(ctx context.Context, masterKey []byte) error {
+	c.logger.Trace("000003000003 mounts and router", "mounts", c.mounts, "router", c.router)
 	// Attempt to unlock
 	if err := c.barrier.Unseal(ctx, masterKey); err != nil {
 		return err
 	}
 
+	c.logger.Trace("000000300004 mounts and router", "mounts", c.mounts, "router", c.router)
 	if err := c.startClusterListener(ctx); err != nil {
 		return err
 	}
@@ -1833,6 +1837,7 @@ func (c *Core) unsealInternal(ctx context.Context, masterKey []byte) error {
 		return err
 	}
 
+	c.logger.Trace("000003000005 mounts and router", "mounts", c.mounts, "router", c.router)
 	// Do post-unseal setup if HA is not enabled
 	if c.ha == nil {
 		// We still need to set up cluster info even if it's not part of a
@@ -1858,6 +1863,7 @@ func (c *Core) unsealInternal(ctx context.Context, masterKey []byte) error {
 			c.logger.Warn("vault is sealed")
 			return err
 		}
+		c.logger.Trace("00000300006 mounts and router", "mounts", c.mounts, "router", c.router)
 
 		// Force a cache bust here, which will also run migration code
 		if c.seal.RecoveryKeySupported() {
@@ -1880,6 +1886,7 @@ func (c *Core) unsealInternal(ctx context.Context, masterKey []byte) error {
 	if c.logger.IsInfo() {
 		c.logger.Info("vault is unsealed")
 	}
+	c.logger.Trace("100000000003 mounts and router", "mounts", c.mounts, "router", c.router)
 
 	if c.serviceRegistration != nil {
 		if err := c.serviceRegistration.NotifySealedStateChange(false); err != nil {
@@ -2222,10 +2229,12 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 	// for the active startup.
 	c.activeTime = time.Now().UTC()
 
+	c.logger.Trace("0000500000 unsealer unseal", "mounts", c.mounts)
 	if err := postUnsealPhysical(c); err != nil {
 		return err
 	}
 
+	c.logger.Trace("0000500001 unsealer unseal", "mounts", c.mounts)
 	// Only perf primarys should write feature flags, but we do it by
 	// excluding other states so that we don't have to change it when
 	// a non-replicated cluster becomes a primary.
@@ -2245,12 +2254,15 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 	if err := c.setupPluginCatalog(ctx); err != nil {
 		return err
 	}
+	c.logger.Trace("0000500002 unsealer unseal", "mounts", c.mounts)
 	if err := c.loadMounts(ctx); err != nil {
 		return err
 	}
+	c.logger.Trace("0000500003 unsealer unseal", "mounts", fmt.Sprintf("%#v", c.mounts))
 	if err := c.setupMounts(ctx); err != nil {
 		return err
 	}
+	c.logger.Trace("0000500004 unsealer unseal", "mounts", fmt.Sprintf("%#v", c.mounts))
 	if err := c.setupPolicyStore(ctx); err != nil {
 		return err
 	}
@@ -2344,6 +2356,7 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 func (c *Core) postUnseal(ctx context.Context, ctxCancelFunc context.CancelFunc, unsealer UnsealStrategy) (retErr error) {
 	defer metrics.MeasureSince([]string{"core", "post_unseal"}, time.Now())
 
+	c.logger.Trace("000000400000 mounts and router", "mounts", c.mounts)
 	// Clear any out
 	c.postUnsealFuncs = nil
 
@@ -2367,6 +2380,7 @@ func (c *Core) postUnseal(ctx context.Context, ctxCancelFunc context.CancelFunc,
 
 	// Purge these for safety in case of a rekey
 	_ = c.seal.SetBarrierConfig(ctx, nil)
+	c.logger.Trace("000000400001 mounts and router", "mounts", c.mounts)
 	if c.seal.RecoveryKeySupported() {
 		_ = c.seal.SetRecoveryConfig(ctx, nil)
 	}
@@ -2397,6 +2411,7 @@ func (c *Core) postUnseal(ctx context.Context, ctxCancelFunc context.CancelFunc,
 		seal.StartHealthCheck()
 	}
 
+	c.logger.Trace("000000400002 mounts and router", "mounts", c.mounts)
 	// This is intentionally the last block in this function. We want to allow
 	// writes just before allowing client requests, to ensure everything has
 	// been set up properly before any writes can have happened.
@@ -2435,9 +2450,11 @@ func (c *Core) postUnseal(ctx context.Context, ctxCancelFunc context.CancelFunc,
 		close(jobs)
 	}
 
+	c.logger.Trace("000000400004 mounts and router", "mounts", c.mounts)
 	if api.ReadBaoVariable(EnvVaultDisableLocalAuthMountEntities) != "" {
 		c.logger.Warn("disabling entities for local auth mounts through env var", "env", EnvVaultDisableLocalAuthMountEntities)
 	}
+	c.logger.Trace("000000400005 mounts and router", "mounts", c.mounts)
 	c.loginMFABackend.usedCodes = cache.New(0, 30*time.Second)
 	c.logger.Info("post-unseal setup complete")
 	return nil

@@ -103,11 +103,11 @@ var (
 		if ns != "" {
 			id += `/` + strings.Trim(ns, `/`)
 		}
-		r.WithContext(namespace.ContextWithNamespace(r.Context(), &namespace.Namespace{
+
+		r = r.WithContext(namespace.ContextWithNamespace(r.Context(), &namespace.Namespace{
 			ID:             id,
 			CustomMetadata: map[string]string{},
 		}))
-
 		return r, 0
 	}
 

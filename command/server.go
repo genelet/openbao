@@ -1045,6 +1045,7 @@ func (c *ServerCommand) Run(args []string) int {
 	// Ensure logging is flushed if initialization fails
 	defer c.flushLog()
 
+	c.logger.Trace("0000000000 after args and config read", "args", args)
 	// create GRPC logger
 	namedGRPCLogFaker := c.logger.Named("grpclogfaker")
 	c.allLoggers = append(c.allLoggers, namedGRPCLogFaker)
@@ -1063,6 +1064,7 @@ func (c *ServerCommand) Run(args []string) int {
 
 	logProxyEnvironmentVariables(c.logger)
 
+	c.logger.Trace("0000000001 metrics")
 	inmemMetrics, metricSink, prometheusEnabled, err := configutil.SetupTelemetry(&configutil.SetupTelemetryOpts{
 		Config:      config.Telemetry,
 		Ui:          c.UI,
@@ -1077,6 +1079,7 @@ func (c *ServerCommand) Run(args []string) int {
 	}
 	metricsHelper := metricsutil.NewMetricsHelper(inmemMetrics, prometheusEnabled)
 
+	c.logger.Trace("0000000002 backend")
 	// Initialize the storage backend
 	var backend physical.Backend
 	if !c.flagDev || config.Storage != nil {
@@ -1116,6 +1119,7 @@ func (c *ServerCommand) Run(args []string) int {
 	}
 
 	sort.Strings(envVarKeys)
+	c.logger.Trace("0000000003 environment", "variables", envVarKeys)
 
 	key := "environment variables"
 	info[key] = strings.Join(envVarKeys, ", ")
@@ -1148,6 +1152,7 @@ func (c *ServerCommand) Run(args []string) int {
 		c.UI.Error("Could not create barrier seal! Most likely proper Seal configuration information was not set, but no error was generated.")
 		return 1
 	}
+	c.logger.Trace("0000000004 barrier seal")
 
 	// prepare a secure random reader for core
 	secureRandomReader, err := configutil.CreateSecureRandomReaderFunc(config.SharedConfig, barrierWrapper)
@@ -1160,6 +1165,7 @@ func (c *ServerCommand) Run(args []string) int {
 	if c.flagDevThreeNode {
 		return c.enableThreeNodeDevCluster(&coreConfig, info, infoKeys, c.flagDevListenAddr, api.ReadBaoVariable("BAO_DEV_TEMP_DIR"))
 	}
+	c.logger.Trace("0000000005 core config", "coreConfig", coreConfig)
 
 	if c.flagDevFourCluster {
 		return enableFourClusterDev(c, &coreConfig, info, infoKeys, c.flagDevListenAddr, api.ReadBaoVariable("BAO_DEV_TEMP_DIR"))
@@ -1225,6 +1231,7 @@ func (c *ServerCommand) Run(args []string) int {
 		}
 	}
 
+	c.logger.Trace("0000000006 start new core, using coreConfig")
 	// Initialize the core
 	core, newCoreError := vault.NewCore(&coreConfig)
 	if newCoreError != nil {
@@ -1238,6 +1245,7 @@ func (c *ServerCommand) Run(args []string) int {
 		c.UI.Warn("")
 
 	}
+	c.logger.Trace("0000000007 core initialized")
 
 	// Copy the reload funcs pointers back
 	c.reloadFuncs = coreConfig.ReloadFuncs
@@ -1270,6 +1278,7 @@ func (c *ServerCommand) Run(args []string) int {
 		}
 	}
 
+	c.logger.Trace("0000000008 get listeners")
 	status, lns, clusterAddrs, errMsg := c.InitListeners(config, disableClustering, &infoKeys, &info)
 
 	if status != 0 {
@@ -1373,12 +1382,14 @@ func (c *ServerCommand) Run(args []string) int {
 		return 1
 	}
 
+	c.logger.Trace("0000000009 start http servers")
 	// Initialize the HTTP servers
 	err = startHttpServers(c, core, config, lns)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
+	c.logger.Trace("0000000010 http servers started")
 
 	if c.flagTestServerConfig {
 		return 0
