@@ -33,7 +33,7 @@ func TestTDEngine_Backend(t *testing.T) {
 	if b.database != "openbao" {
 		t.Fatalf("Database name does not match")
 	}
-	if b.sTable != "superbao" {
+	if b.sTables["stable"][0] != "superbao" {
 		t.Fatalf("Table name does not match")
 	}
 }

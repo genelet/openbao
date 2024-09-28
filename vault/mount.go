@@ -603,9 +603,11 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	NamespaceByID(ctx, ns.ID, c)
 
 	// Basic check for matching names
-	for i, ent := range c.mounts.Entries {
-		c.Logger().Trace("222222222", "i", i, "ent_type", ent.Type, "ent_id", ent.NamespaceID, "ent_path", ent.Path, "entry_type", entry.Type, "entry_id", entry.NamespaceID, "entry_path", entry.Path)
-		if ns.ID == ent.NamespaceID {
+	for _, ent := range c.mounts.Entries {
+		// oss start
+		// if ns.ID == ent.NamespaceID {
+		if ns.ID == namespace.RootNamespaceID {
+			// oss end
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
@@ -614,20 +616,15 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 			case strings.HasPrefix(entry.Path, ent.Path):
 				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
 			}
-
-			// oss start
-			if match := c.router.MountConflict(ctx, entry.Path); match != "" {
-				return logical.CodedError(409, fmt.Sprintf("existing mount at %s", match))
-			}
-			// oss end
 		}
 	}
 
 	// Verify there are no conflicting mounts in the router
+	if match := c.router.MountConflict(ctx, entry.Path); match != "" {
+		return logical.CodedError(409, fmt.Sprintf("existing mount at %s", match))
+	}
 	// oss start
-	// if match := c.router.MountConflict(ctx, entry.Path); match != "" {
-	//	return logical.CodedError(409, fmt.Sprintf("existing mount at %s", match))
-	//}
+	// we should force writing mount entry to the root namespace
 	// oss end
 
 	// Generate a new UUID and view
@@ -669,12 +666,10 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	defer view.setReadOnlyErr(origReadOnlyErr)
 
 	var backend logical.Backend
-	c.Logger().Trace("333333333 start view", "entry_type", entry.Type, "entry_ns", entry.NamespaceID, "entry_path", entry.Path)
 	sysView := c.mountEntrySysView(entry)
 
 	backend, entry.RunningSha256, err = c.newLogicalBackend(ctx, entry, sysView, view)
 	if err != nil {
-		c.Logger().Trace("44444444 failed to create backend", "error", err)
 		return err
 	}
 	if backend == nil {
@@ -711,7 +706,6 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	c.mounts = newTable
 
 	if err := c.router.Mount(backend, entry.Path, entry, view); err != nil {
-		c.logger.Trace("55555555 failed to mount backend", "error", err)
 		return err
 	}
 
@@ -721,7 +715,6 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	// initialize, using the core's active context.
 	err = backend.Initialize(c.activeContext, &logical.InitializationRequest{Storage: view})
 	if err != nil {
-		c.logger.Trace("66666666 failed to initialize backend", "error", err)
 		return err
 	}
 
@@ -806,6 +799,26 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 	if match == "" || ns.Path+path != match {
 		return fmt.Errorf("no matching mount")
 	}
+
+	// oss start
+	// c.router.MatchingMount would scan underlying for namespace match
+	// c.router.MatchingStorageByAPIPath is in root space only
+	// c.router.MatchingBackend is in root space only
+	// maybe we move this part to be before removeMountEntry ?
+	var arr []string
+	if td, ok := getTD(c.underlyingPhysical); ok {
+		if err = td.RemoveMount(ctx, path); err == nil {
+			arr, err = td.ListMounts(ctx, path)
+		}
+	}
+	if err != nil {
+		c.logger.Error("failed to remove mount entry for path being unmounted", "error", err, "path", path)
+		return err
+	}
+	if len(arr) > 0 {
+		return nil
+	}
+	// oss end
 
 	// Get the view for this backend
 	view := c.router.MatchingStorageByAPIPath(ctx, path)

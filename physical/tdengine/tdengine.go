@@ -22,6 +22,7 @@ package tdengine
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -29,12 +30,20 @@ import (
 	"time"
 
 	metrics "github.com/armon/go-metrics"
-	log "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/physical"
 	_ "github.com/taosdata/driver-go/v3/taosRestful"
+)
+
+const (
+	errTableExist    = "failed to check tdengine table exist"
+	errTableCreate   = "failed to create tdengine table"
+	errTableDrop     = "failed to drop tdengine table"
+	errParentExist   = "failed to check tdengine parent table exist"
+	errChildrenExist = "failed to check tdengine children exist"
 )
 
 // Verify TDEngineBackend satisfies the correct interfaces
@@ -47,66 +56,81 @@ var (
 type TDEngineBackend struct {
 	db         *sql.DB
 	database   string
+	sTables    map[string][]string
 	sTable     string
-	logger     log.Logger
+	logger     hclog.Logger
 	permitPool *physical.PermitPool
 	conf       map[string]string
 }
 
-func NewTDEnginePhysicalBackend(conf map[string]string, logger log.Logger) (physical.Backend, error) {
+func NewTDEnginePhysicalBackend(conf map[string]string, logger hclog.Logger) (physical.Backend, error) {
 	return NewTDEngineBackend(conf, logger)
 }
 
 // NewTDEngineBackend constructs a TDEngine backend using the given API client and
 // server address and credential for accessing tdengine database.
-func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBackend, error) {
-	connURL := conf["connection_url"]
+func NewTDEngineBackend(conf map[string]string, logger hclog.Logger) (*TDEngineBackend, error) {
+	var connURL string
+	if v, ok := conf["connection_url"]; ok {
+		connURL = v
+	}
 	if envURL := api.ReadBaoVariable("TDENGINE_CONNECTION_URL"); envURL != "" {
 		connURL = envURL
 	}
-
-	var maxParInt int
-	var err error
-	maxParStr, ok := conf["max_parallel"]
-	if ok {
-		maxParInt, err = strconv.Atoi(maxParStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed parsing max_parallel parameter: %w", err)
-		}
-		logger.Debug("max_parallel set", "max_parallel", maxParInt)
-	} else {
-		maxParInt = physical.DefaultParallelOperations
+	if connURL == "" {
+		return nil, fmt.Errorf("missing connection_url parameter")
 	}
 	db, err := sql.Open("taosRestful", connURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect TDEngine: %w", err)
 	}
-	db.SetMaxOpenConns(maxParInt)
 
-	maxIdleConnsStr, ok := conf["max_idle_connections"]
-	if ok {
-		maxIdleConns, err := strconv.Atoi(maxIdleConnsStr)
+	maxParInt := physical.DefaultParallelOperations
+	if v, ok := conf["max_parallel"]; ok {
+		maxParInt, err = strconv.Atoi(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed parsing max_idle_connections parameter: %w", err)
+			return nil, fmt.Errorf("failed to convert max_parallel to int: %w", err)
 		}
-		logger.Debug("max_idle_connections set", "max_idle_connections", maxIdleConnsStr)
+	}
+	db.SetMaxOpenConns(maxParInt)
+	if v, ok := conf["max_idle_connections"]; ok {
+		maxIdleConns, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert max_idle_connections to int: %w", err)
+		}
 		db.SetMaxIdleConns(maxIdleConns)
 	}
 
-	database := conf["database"]
-	if database == "" {
-		database = "openbao"
+	database := "openbao"
+	if v, ok := conf["database"]; ok {
+		database = v
 	}
 
-	sTable := conf["stable"]
-	if sTable == "" {
-		sTable = "superbao"
+	sTables := map[string][]string{
+		"stable": {"superbao", "root", "ts timestamp, k VARCHAR(4096), v VARBINARY(60000)"},
+		"smount": {"supermount", "mount", "ts timestamp, k VARCHAR(1024), v VARCHAR(128)"},
+		"sauth":  {"superauth", "auth", "ts timestamp, k VARCHAR(1024), v VARCHAR(128)"},
+	}
+
+	var sTable string
+	if v, ok := conf["stable"]; ok {
+		sTable = v
+	} else if v, ok := conf["stables"]; ok {
+		err = json.Unmarshal([]byte(v), &sTables)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal stables: %w", err)
+		}
+	}
+
+	if logger == nil {
+		logger = hclog.Default()
 	}
 
 	// Setup the backend.
 	m := &TDEngineBackend{
 		db:         db,
 		database:   database,
+		sTables:    sTables,
 		sTable:     sTable,
 		logger:     logger,
 		permitPool: physical.NewPermitPool(maxParInt),
@@ -126,39 +150,51 @@ func NewTDEngineBackend(conf map[string]string, logger log.Logger) (*TDEngineBac
 		logger.Debug("tdengine database created", "database", database)
 	}
 
-	stableExist, err := m.existingStable(sTable)
-	if err != nil {
-		logger.Error("failed to check tdengine stable exist", "stable", sTable, "error", err)
-		return nil, fmt.Errorf("failed to check tdengine stable exist: %w", err)
-	} else if !stableExist {
-		createSTable := conf["create_stable"]
-		if createSTable == "" {
-			createSTable = `CREATE STABLE IF NOT EXISTS ` + sTable + ` ( ts timestamp, k VARCHAR(4096), v VARBINARY(60000) ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`
+	created2 := func(stable, statement, tname string) error {
+		stableExist, err := m.existingStable(stable)
+		if err != nil {
+			logger.Error("failed to check tdengine stable exist", "stable", stable, "error", err)
+			return fmt.Errorf("failed to check tdengine stable exist: %w", err)
+		} else if !stableExist {
+			if _, err = db.Exec(statement); err != nil {
+				return fmt.Errorf("failed to create tdengine stable %s: %w", stable, err)
+			}
+			logger.Debug("tdengine stable created", "stable", stable)
 		}
-		if _, err = db.Exec(createSTable); err != nil {
-			return nil, fmt.Errorf("failed to create tdengine stable %s: %w", sTable, err)
+
+		tableExist, err := m.existingTable(tname)
+		if err != nil {
+			return fmt.Errorf("failed to check tdengine root table exist: %w", err)
+		} else if !tableExist {
+			id := namespace.RootNamespaceID
+			path := ""
+			if v, ok := conf["ns_id"]; ok {
+				id = v
+			}
+			if v, ok := conf["ns_path"]; ok {
+				path = v
+			}
+			statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + stable + ` (NamespaceID, NamespacePath) TAGS ("` + id + `", "` + path + `")`
+			if _, err = m.db.Exec(statement); err != nil {
+				return fmt.Errorf("%s %s: %w", errTableCreate, tname, err)
+			}
+			logger.Debug("tdengine root table created", "table", tname)
 		}
-		logger.Debug("tdengine stable created", "stable", sTable)
+		return nil
 	}
 
-	tname, ok := conf["table"]
-	if !ok {
-		tname = tablename(namespace.RootNamespace)
-	}
-	tableExist, err := m.existingTable(tname)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check tdengine root table exist: %w", err)
-	} else if !tableExist {
-		id, ok := conf["ns_id"]
-		if !ok {
-			id = namespace.RootNamespaceID
+	if v, ok := conf["create_"+sTable]; ok {
+		err = created2(sTable, v, conf["table"])
+		if err != nil {
+			return nil, err
 		}
-		id = strings.Trim(id, "/")
-		path := conf["ns_path"]
-		if _, err = m.db.Exec("CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + path + `" )`); err != nil {
-			return nil, fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
+	} else {
+		for _, item := range sTables {
+			err = created2(item[0], `CREATE STABLE IF NOT EXISTS `+m.database+`.`+item[0]+` ( `+item[2]+` ) TAGS ( NamespaceID VARCHAR(1024), NamespacePath VARCHAR(64) )`, item[1])
+			if err != nil {
+				return nil, err
+			}
 		}
-		logger.Debug("tdengine root table created", "table", tname)
 	}
 
 	return m, err
@@ -169,8 +205,35 @@ func quote(s string) string {
 }
 
 // tablename returns the table name for the current namespace.
-func tablename(ns *namespace.Namespace) string {
-	return quote(strings.ReplaceAll(ns.ID, "/", "_"))
+func tablename(ns *namespace.Namespace, change ...string) string {
+	x := strings.ReplaceAll(strings.ReplaceAll(ns.ID, "-", ""), "/", "_")
+	if len(change) > 0 {
+		x = change[0] + x[len(namespace.RootNamespaceID):]
+	}
+	return quote(x)
+}
+
+// get table name from context namespace.
+func (m *TDEngineBackend) getTablename(ctx context.Context, change ...string) (string, error) {
+	ns, err := namespace.FromContext(ctx)
+	if err != nil && err == namespace.ErrNoNamespace {
+		root := namespace.RootNamespaceID
+		if len(change) > 0 {
+			root = change[0]
+		}
+		if m.conf != nil && m.conf["ns_path"] != "" {
+			return m.database + `.` + root + "_" + m.conf["ns_path"], nil
+		}
+		return m.database + `.` + root, nil
+	} else if err != nil {
+		return "", fmt.Errorf("namespace in ctx error: %w", err)
+	}
+
+	if m.conf != nil && m.conf["ns_path"] != "" {
+		path := strings.ReplaceAll(m.conf["ns_path"], "-", "")
+		return m.database + `.` + tablename(ns, change...) + "_" + path, nil
+	}
+	return m.database + `.` + tablename(ns, change...), nil
 }
 
 func (m *TDEngineBackend) existingChildren(tname string) (bool, error) {
@@ -207,8 +270,8 @@ func (m *TDEngineBackend) CreateIfNotExists(ctx context.Context, ns1 string) err
 	parent := tablename(ns0)
 	parentExist, err := m.existingTable(parent)
 	if err != nil {
-		m.logger.Error("failed to check tdengine parent table exist", "parent", parent, "error", err)
-		return fmt.Errorf("failed to check tdengine parent table exist: %w", err)
+		m.logger.Error(errParentExist, "parent", parent, "error", err)
+		return fmt.Errorf("%s: %w", errParentExist, err)
 	} else if !parentExist {
 		m.logger.Error("parent namespace not found", "parent", parent)
 		return fmt.Errorf("parent namespace not found")
@@ -226,17 +289,37 @@ func (m *TDEngineBackend) CreateIfNotExists(ctx context.Context, ns1 string) err
 	}
 
 	tname := parent + "_" + ns1
+	tname = strings.ReplaceAll(tname, "-", "")
 	id := ns0.ID + "/" + ns1
 	p := ns0.Path
 
 	// Create the table if it does not exist.
-	statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + p + `" )`
-	_, err = m.db.Exec(statement)
-	if err != nil {
-		m.logger.Error("failed to create tdengine table", "table", tname, "error", err)
-		return fmt.Errorf("failed to create tdengine table %s: %w", tname, err)
+	if m.sTable != "" {
+		statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + tname + " USING " + m.database + "." + m.sTable + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + p + `" )`
+		_, err = m.db.Exec(statement)
+		if err != nil {
+			m.logger.Error(errTableCreate, "table", tname, "error", err)
+			return fmt.Errorf("%s %s: %w", errTableCreate, tname, err)
+		}
+	} else {
+		for k, item := range m.sTables {
+			var t string
+			switch k {
+			case "smount":
+				t = "mount" + tname[len(namespace.RootNamespaceID):]
+			case "sauth":
+				t = "auth" + tname[len(namespace.RootNamespaceID):]
+			default:
+				t = tname
+			}
+			statement := "CREATE TABLE IF NOT EXISTS " + m.database + "." + t + " USING " + m.database + "." + item[0] + ` ( NamespaceID, NamespacePath ) TAGS ( "` + id + `", "` + p + `" )`
+			_, err = m.db.Exec(statement)
+			if err != nil {
+				m.logger.Error(errTableCreate, "table", t, "error", err)
+				return fmt.Errorf("%s %s: %w", errTableCreate, t, err)
+			}
+		}
 	}
-
 	m.logger.Debug("tdengine table created", "table", tname)
 	return nil
 }
@@ -254,11 +337,12 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 		return fmt.Errorf("invalid namespace path %s", ns1)
 	}
 	tname := parent + "_" + ns1
+	tname = strings.ReplaceAll(tname, "-", "")
 
 	tableExist, err := m.existingTable(tname)
 	if err != nil {
-		m.logger.Error("failed to check tdengine table exist", "tname", tname, "error", err)
-		return fmt.Errorf("failed to check tdengine parent table exist: %w", err)
+		m.logger.Error(errTableExist, "tname", tname, "error", err)
+		return fmt.Errorf("%s: %w", errParentExist, err)
 	} else if !tableExist {
 		m.logger.Error("namespace not found", "tname", tname)
 		return fmt.Errorf("namespace not found %s", ns1)
@@ -266,8 +350,8 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 
 	tagExist, err := m.existingChildren(tname)
 	if err != nil {
-		m.logger.Error("failed to check tdengine children exist", "table", tname, "error", err)
-		return fmt.Errorf("failed to check tdengine children exist: %w", err)
+		m.logger.Error(errChildrenExist, "table", tname, "error", err)
+		return fmt.Errorf("%s: %w", errChildrenExist, err)
 	} else if tagExist {
 		m.logger.Error("children namespace found", "table", tname)
 		return fmt.Errorf("children namespace found %s", ns1)
@@ -279,33 +363,35 @@ func (m *TDEngineBackend) DropIfExists(ctx context.Context, ns1 string) error {
 	default:
 	}
 
-	statement := "DROP TABLE IF EXISTS " + m.database + "." + tname
-	_, err = m.db.Exec(statement)
-	if err != nil {
-		m.logger.Error("failed to drop tdengine table", "table", tname, "statement", statement, "error", err)
-		return fmt.Errorf("failed to drop tdengine table %w", err)
+	if m.sTable != "" {
+		statement := "DROP TABLE IF EXISTS " + m.database + "." + tname
+		_, err = m.db.Exec(statement)
+		if err != nil {
+			m.logger.Error(errTableDrop, "table", tname, "statement", statement, "error", err)
+			return fmt.Errorf("%s %w", errTableDrop, err)
+		}
+	} else {
+		for k := range m.sTables {
+			var t string
+			switch k {
+			case "smount":
+				t = "mount" + tname[len(namespace.RootNamespaceID):]
+			case "sauth":
+				t = "auth" + tname[len(namespace.RootNamespaceID):]
+			default:
+				t = tname
+			}
+			statement := "DROP TABLE IF EXISTS " + m.database + "." + t
+			_, err = m.db.Exec(statement)
+			if err != nil {
+				m.logger.Error(errTableDrop, "table", t, "statement", statement, "error", err)
+				return fmt.Errorf("%s %w", errTableDrop, err)
+			}
+		}
 	}
 
 	m.logger.Debug("tdengine table dropped", "table", tname)
 	return nil
-}
-
-// get table name from context namespace.
-func (m *TDEngineBackend) getTablename(ctx context.Context) (string, error) {
-	ns, err := namespace.FromContext(ctx)
-	if err != nil && err == namespace.ErrNoNamespace {
-		if m.conf != nil && m.conf["ns_path"] != "" {
-			return m.database + `.` + namespace.RootNamespaceID + "_" + m.conf["ns_path"], nil
-		}
-		return m.database + `.` + namespace.RootNamespaceID, nil
-	} else if err != nil {
-		return "", fmt.Errorf("namespace in ctx error: %w", err)
-	}
-
-	if m.conf != nil && m.conf["ns_path"] != "" {
-		return m.database + `.` + tablename(ns) + "_" + m.conf["ns_path"], nil
-	}
-	return m.database + `.` + tablename(ns), nil
 }
 
 // Get is used to fetch an entry.
@@ -331,13 +417,14 @@ func (m *TDEngineBackend) GetWithDuration(ctx context.Context, key string, durat
 	var value []byte
 	err = m.db.QueryRowContext(ctx, statement).Scan(&ts, &value)
 	if err == sql.ErrNoRows {
-		m.logger.Debug("tdengine get", "table", tname, "key", key, "record", "not found")
+		m.logger.Debug("tdengine get", "table", statement, "key", key, "record", "not found")
 		return nil, nil
 	} else if err != nil {
+		m.logger.Error("failed to query", "table", statement, "key", key, "error", err)
 		return nil, fmt.Errorf("failed to query %w", err)
 	}
 
-	m.logger.Debug("tdengine get", "table", tname, "key", key)
+	m.logger.Debug("tdengine get", "table", statement, "key", key)
 
 	bs, err := ts.MarshalBinary()
 	return &physical.Entry{
@@ -392,14 +479,16 @@ func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.E
 	var ts time.Time
 	err = m.db.QueryRowContext(ctx, `SELECT ts FROM `+tname+` WHERE k="`+key+`" ORDER BY ts DESC LIMIT 1`).Scan(&ts)
 	if err != nil && err != sql.ErrNoRows {
+		m.logger.Error("failed to check existing", "table", tname, "key", key, "error", err)
 		return fmt.Errorf("failed to check existing %w", err)
 	} else if err != sql.ErrNoRows { // existing
 		if patch == 1 {
 			return nil
 		} else {
-			s := strings.Split(fmt.Sprintf("%s", ts), " ")
+			s := strings.Split(ts.String(), " ")
 			_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
 			if err != nil {
+				m.logger.Error("failed to delete", "table", tname, "key", key, "error", err)
 				return fmt.Errorf("failed to delete %w", err)
 			}
 		}
@@ -407,13 +496,19 @@ func (m *TDEngineBackend) AddWithDuration(ctx context.Context, entry *physical.E
 
 	var statement string
 	if d > 0 {
-		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now+%d, '%s', "\x%x")`, tname, d, key, entry.Value)
+		nano := time.Now().UnixNano()
+		statement = fmt.Sprintf(`INSERT INTO %s VALUES (%d, '%s', "\x%x")`, tname, nano+d, key, entry.Value)
 	} else {
 		statement = fmt.Sprintf(`INSERT INTO %s VALUES (now, '%s', "\x%x")`, tname, key, entry.Value)
 	}
 	_, err = m.db.ExecContext(ctx, statement)
-	m.logger.Debug("tdengine put", "table", tname, "key", key, "possible error", err)
-	return err
+	if err != nil {
+		m.logger.Error("tdengine failed to put", "key", key, "error", err)
+		return fmt.Errorf("failed to put %w", err)
+	}
+	m.logger.Debug("tdengine put", "table", tname, "key", key)
+
+	return nil
 }
 
 // Put is used to insert or update an entry.
@@ -445,7 +540,7 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 		m.logger.Debug("tdengine delete", "key not found", key)
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to query %w", err)
+		return fmt.Errorf("failed to query %s: %w", statement, err)
 	}
 	defer rows.Close()
 
@@ -455,8 +550,9 @@ func (m *TDEngineBackend) Delete(ctx context.Context, key string) error {
 		if err != nil {
 			return fmt.Errorf("failed to scan ts %w", err)
 		}
-		s := strings.Split(fmt.Sprintf("%s", ts), " ")
-		_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
+		s := strings.Split(ts.String(), " ")
+		statement = `DELETE FROM ` + tname + ` WHERE ts="` + strings.Join(s[:2], " ") + `"`
+		_, err = m.db.ExecContext(ctx, statement)
 		if err != nil {
 			m.logger.Error("failed to delete", "statement", statement, "key", key, "error", err)
 			return fmt.Errorf("failed to delete %w", err)
@@ -521,8 +617,8 @@ func (m *TDEngineBackend) Items(ctx context.Context) ([]*physical.Entry, error) 
 	statement := `SELECT ts, k, v FROM ` + tname
 	rows, err := m.db.QueryContext(ctx, statement)
 	if err != nil {
-		m.logger.Error("failed to item", "table", tname, "statement", statement, "error", err)
-		return nil, fmt.Errorf("failed to item %w", err)
+		m.logger.Error("failed to itemize", "table", tname, "statement", statement, "error", err)
+		return nil, fmt.Errorf("failed to itemize %w", err)
 	}
 	defer rows.Close()
 
@@ -541,7 +637,7 @@ func (m *TDEngineBackend) Items(ctx context.Context) ([]*physical.Entry, error) 
 		})
 	}
 
-	m.logger.Debug("tdengine item", "table", tname)
+	m.logger.Debug("tdengine itemize", "table", tname)
 	return items, nil
 }
 
@@ -660,4 +756,234 @@ func (m *TDEngineBackend) ListPage(ctx context.Context, prefix string, after str
 	}
 
 	return keys, nil
+}
+
+func (m *TDEngineBackend) GetMount(ctx context.Context, mount string, like ...bool) (string, error) {
+	defer metrics.MeasureSince([]string{"tdengine", "get_mount"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "mount")
+	if err != nil {
+		return "", err
+	}
+
+	mount = quote(mount)
+	statement := `SELECT v FROM ` + tname + ` WHERE k`
+	if len(like) > 0 && like[0] {
+		statement += ` LIKE "` + mount + `%"`
+	} else {
+		statement += `="` + mount + `"`
+	}
+
+	var value string
+	err = m.db.QueryRowContext(ctx, statement).Scan(&value)
+	if err == sql.ErrNoRows {
+		m.logger.Debug("tdengine get mount", "table", tname, "mount", mount, "record", "not found")
+		return "", nil
+	} else if err != nil {
+		m.logger.Error("failed to query", "table", statement, "mount", mount, "error", err)
+		return "", fmt.Errorf("failed to query mount %w", err)
+	}
+
+	m.logger.Debug("tdengine get mount", "table", statement, "mount", mount, "value", value)
+	return value, nil
+}
+
+func (m *TDEngineBackend) AddMount(ctx context.Context, mount, typ string) error {
+	defer metrics.MeasureSince([]string{"tdengine", "mount"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "mount")
+	if err != nil {
+		return err
+	}
+
+	var ts time.Time
+	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + quote(mount) + `" AND v="` + quote(typ) + `"`
+	err = m.db.QueryRowContext(ctx, statement).Scan(&ts)
+	if err == nil {
+		m.logger.Debug("tdengine mount", "table", statement, "mount", mount, "record", "already exists")
+		return nil
+	} else if err != sql.ErrNoRows {
+		m.logger.Error("failed to check existing", "table", tname, "mount", mount, "error", err)
+		return fmt.Errorf("failed to check existing %w", err)
+	}
+
+	statement = `INSERT INTO ` + tname + ` VALUES (now, "` + mount + `", "` + typ + `")`
+	_, err = m.db.ExecContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to mount", "table", statement, "mount", mount, "error", err)
+		return fmt.Errorf("failed to mount %w", err)
+	}
+
+	m.logger.Debug("tdengine mount", "table", tname, "mount", mount)
+	return nil
+}
+
+func (m *TDEngineBackend) RemoveMount(ctx context.Context, path string) error {
+	defer metrics.MeasureSince([]string{"tdengine", "unmount"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "mount")
+	if err != nil {
+		return err
+	}
+
+	var ts time.Time
+	statement := `SELECT ts FROM ` + tname + ` WHERE k="` + quote(path) + `"`
+	err = m.db.QueryRowContext(ctx, statement).Scan(&ts)
+	if err == sql.ErrNoRows {
+		m.logger.Debug("tdengine unmount", "table", statement, "mount", path, "record", "not found")
+		return nil
+	} else if err != nil {
+		m.logger.Error("failed to check existing", "table", tname, "mount", path, "error", err)
+		return fmt.Errorf("failed to check existing %w", err)
+	}
+
+	s := strings.Split(ts.String(), " ")
+	statement = `DELETE FROM ` + tname + ` WHERE ts="` + strings.Join(s[:2], " ") + `"`
+	_, err = m.db.ExecContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to unmount", "table", statement, "mount", path, "error", err)
+		return fmt.Errorf("failed to unmount %w", err)
+	}
+
+	m.logger.Debug("tdengine unmount", "table", statement, "mount", path)
+	return nil
+}
+
+func (m *TDEngineBackend) ListMounts(ctx context.Context, path ...string) ([]string, error) {
+	defer metrics.MeasureSince([]string{"tdengine", "list_mount"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "mount")
+	if err != nil {
+		return nil, err
+	}
+
+	statement := `SELECT k FROM `
+	if len(path) == 0 {
+		statement += tname
+	} else {
+		statement += m.database + `.mount WHERE k = "` + quote(path[0]) + `"`
+	}
+	rows, err := m.db.QueryContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to list mount", "table", statement, "error", err)
+		return nil, fmt.Errorf("failed to list mount %w", err)
+	}
+	defer rows.Close()
+
+	var mounts []string
+	for rows.Next() {
+		var mount string
+		err = rows.Scan(&mount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan rows: %w", err)
+		}
+		mounts = append(mounts, mount)
+	}
+
+	m.logger.Debug("tdengine list mount", "table", tname, "mounts", mounts)
+	return mounts, nil
+}
+
+func (m *TDEngineBackend) AddAuth(ctx context.Context, auth, typ string) error {
+	defer metrics.MeasureSince([]string{"tdengine", "auth"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "auth")
+	if err != nil {
+		return err
+	}
+
+	statement := `INSERT INTO ` + tname + `VALUES (now, "` + auth + `", "` + typ + `")`
+	_, err = m.db.ExecContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to auth", "table", tname, "auth", auth, "error", err)
+		return fmt.Errorf("failed to auth %w", err)
+	}
+
+	m.logger.Debug("tdengine auth", "table", tname, "auth", auth)
+	return nil
+}
+
+func (m *TDEngineBackend) RemoveAuth(ctx context.Context, auth string) error {
+	defer metrics.MeasureSince([]string{"tdengine", "unauth"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "auth")
+	if err != nil {
+		return err
+	}
+
+	var ts time.Time
+	err = m.db.QueryRowContext(ctx, `SELECT ts FROM `+tname+` WHERE k="`+auth+`"`).Scan(&ts)
+	if err == sql.ErrNoRows {
+		m.logger.Debug("tdengine unauth", "table", tname, "auth", auth, "record", "not found")
+		return nil
+	} else if err != nil {
+		m.logger.Error("failed to check existing", "table", tname, "auth", auth, "error", err)
+		return fmt.Errorf("failed to check existing %w", err)
+	}
+
+	s := strings.Split(ts.String(), " ")
+	_, err = m.db.ExecContext(ctx, `DELETE FROM `+tname+` WHERE ts="`+strings.Join(s[:2], " ")+`"`)
+	if err != nil {
+		m.logger.Error("failed to unauth", "table", tname, "auth", auth, "error", err)
+		return fmt.Errorf("failed to unauth %w", err)
+	}
+
+	m.logger.Debug("tdengine unauth", "table", tname, "auth", auth)
+	return nil
+}
+
+func (m *TDEngineBackend) ListAuths(ctx context.Context, path ...string) ([]string, error) {
+	defer metrics.MeasureSince([]string{"tdengine", "list_auth"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tname, err := m.getTablename(ctx, "auth")
+	if err != nil {
+		return nil, err
+	}
+
+	statement := `SELECT k FROM `
+	if len(path) == 0 {
+		statement += tname
+	} else {
+		statement += m.database + `.auth WHERE k = "` + path[0] + `"`
+	}
+	rows, err := m.db.QueryContext(ctx, statement)
+	if err != nil {
+		m.logger.Error("failed to list auth", "table", tname, "error", err)
+		return nil, fmt.Errorf("failed to list auth %w", err)
+	}
+	defer rows.Close()
+
+	var auths []string
+	for rows.Next() {
+		var auth string
+		err = rows.Scan(&auth)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan rows: %w", err)
+		}
+		auths = append(auths, auth)
+	}
+
+	m.logger.Debug("tdengine list auth", "table", tname, "auths", auths)
+	return auths, nil
 }

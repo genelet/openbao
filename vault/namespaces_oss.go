@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics"
-	log "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/physical/tdengine"
@@ -281,7 +281,7 @@ type NamespaceStore struct {
 	modifyLock *sync.RWMutex
 
 	// logger is the server logger copied over from core
-	logger log.Logger
+	logger hclog.Logger
 }
 
 // NamespaceEntry is used to store a namespace by name
@@ -291,7 +291,7 @@ type NamespaceEntry struct {
 
 // NewNamespaceStore creates a new NamespaceStore that is backed
 // using a given view. It used used to durable store and manage named namespace.
-func NewNamespaceStore(ctx context.Context, core *Core, baseView *BarrierView, system logical.SystemView, logger log.Logger) (*NamespaceStore, error) {
+func NewNamespaceStore(ctx context.Context, core *Core, baseView *BarrierView, system logical.SystemView, logger hclog.Logger) (*NamespaceStore, error) {
 	ps := &NamespaceStore{
 		aclView:    baseView.SubView(namespaceSubPath),
 		modifyLock: new(sync.RWMutex),
@@ -346,16 +346,20 @@ func (ps *NamespaceStore) invalidate(ctx context.Context, path string) error {
 	return nil
 }
 
-func (ps *NamespaceStore) getTD() (td *tdengine.TDEngineBackend, ok bool) {
-	switch t := ps.core.underlyingPhysical.(type) {
+func getTD(b physical.Backend) (*tdengine.TDEngineBackend, bool) {
+	switch t := b.(type) {
 	case *physical.ErrorInjector:
-		td, ok = t.GetBackend().(*tdengine.TDEngineBackend)
+		td, ok := t.GetBackend().(*tdengine.TDEngineBackend)
+		return td, ok
 	case *tdengine.TDEngineBackend:
-		td = t
-		ok = true
+		return t, true
 	default:
 	}
-	return td, ok
+	return nil, false
+}
+
+func (ps *NamespaceStore) getTD() (td *tdengine.TDEngineBackend, ok bool) {
+	return getTD(ps.core.underlyingPhysical)
 }
 
 // SetNamespace is used to create or update the given namespace

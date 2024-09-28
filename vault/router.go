@@ -20,6 +20,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/salt"
 	"github.com/openbao/openbao/sdk/v2/logical"
+	"github.com/openbao/openbao/sdk/v2/physical"
 )
 
 var deniedPassthroughRequestHeaders = []string{
@@ -41,6 +42,9 @@ type Router struct {
 	// For example, logical/uuid1/foobar -> secrets/ (kv backend) + foobar
 	storagePrefix *radix.Tree
 	logger        hclog.Logger
+	// oss start
+	underlyingPhysical physical.Backend
+	// oss end
 }
 
 // NewRouter returns a new router
@@ -170,15 +174,35 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	r.l.Lock()
 	defer r.l.Unlock()
 
+	// oss start
+	originalPrefix := prefix
+	// oss end
+
 	// prepend namespace
 	prefix = mountEntry.Namespace().Path + prefix
 
-	ns := mountEntry.Namespace()
-	r.logger.Trace("77777777 Mount", "ns", ns, "type", mountEntry.Type, "nsID", mountEntry.NamespaceID, "prefix", prefix, "radix", fmt.Sprintf("%v", r.root.ToMap()))
 	// Check if this is a nested mount
-	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
+	// oss start
+	// if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
+	existing, _, ok := r.root.LongestPrefix(prefix)
+	if ok && existing != "" && mountEntry.NamespaceID == namespace.RootNamespaceID {
+		// oss end
 		return fmt.Errorf("cannot mount under existing mount %q", existing)
 	}
+
+	// oss start
+	if td, okk := getTD(r.underlyingPhysical); okk {
+		ctx := namespace.ContextWithNamespace(context.Background(), &namespace.Namespace{ID: mountEntry.NamespaceID})
+		if err := td.AddMount(ctx, originalPrefix, mountEntry.Type); err != nil {
+			r.logger.Error("failed to add mount", "err", err)
+			return err
+		}
+	}
+
+	if ok && existing != "" {
+		return nil
+	}
+	// oss end
 
 	// Build the paths
 	paths := new(logical.Paths)
@@ -368,6 +392,23 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 	if !ok {
 		return ""
 	}
+
+	// oss start
+	// mount != "", means a match is found in the root namespace
+	// let's see if the path is found in that specific namespace
+	if td, ok := getTD(r.underlyingPhysical); ok {
+		typ, err := td.GetMount(ctx, path)
+		if err != nil {
+			r.logger.Error("failed to get mount", "err", err)
+			return ""
+		}
+		if typ != "" {
+			return path
+		}
+		return typ
+	}
+	// oss end
+
 	return mount
 }
 
@@ -398,9 +439,12 @@ func (r *Router) MountConflict(ctx context.Context, path string) string {
 	if exactMatch := r.matchingMountInternal(ctx, path); exactMatch != "" {
 		return exactMatch
 	}
-	if prefixMatch := r.matchingPrefixInternal(ctx, path); prefixMatch != "" {
-		return prefixMatch
-	}
+	// oss start
+	// "like" is used in matchingMountInternal
+	// if prefixMatch := r.matchingPrefixInternal(ctx, path); prefixMatch != "" {
+	// 	return prefixMatch
+	//}
+	// oss end
 	return ""
 }
 
@@ -450,6 +494,20 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 	if !ok {
 		return nil
 	}
+
+	// oss start
+	if td, ok := getTD(r.underlyingPhysical); ok {
+		typ, err := td.GetMount(ctx, path)
+		if err != nil {
+			r.logger.Error("failed to get mount", "err", err)
+			return nil
+		}
+		if typ == "" {
+			return nil
+		}
+	}
+	// oss end
+
 	return raw.(*routeEntry).mountEntry
 }
 

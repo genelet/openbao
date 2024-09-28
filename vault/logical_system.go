@@ -38,6 +38,10 @@ import (
 	"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/monitor"
 	"github.com/openbao/openbao/helper/namespace"
+
+	// oss start
+
+	// oss end
 	"github.com/openbao/openbao/helper/random"
 	"github.com/openbao/openbao/helper/versions"
 	"github.com/openbao/openbao/sdk/v2/framework"
@@ -947,6 +951,15 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 		Data: make(map[string]interface{}),
 	}
 
+	// oss start
+	var filter []string
+	if td, ok := getTD(b.Core.underlyingPhysical); ok {
+		if filter, err = td.ListMounts(ctx); err != nil {
+			return nil, err
+		}
+	}
+	// oss end
+
 	for _, entry := range b.Core.mounts.Entries {
 		// Only show entries for current namespace
 		if entry.Namespace().Path != ns.Path {
@@ -955,7 +968,22 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 
 		// Populate mount info
 		info := b.mountInfo(ctx, entry)
-
+		// oss start
+		grep := func(list []string, single string) bool {
+			if list == nil {
+				return false
+			}
+			for _, item := range list {
+				if item == single {
+					return true
+				}
+			}
+			return false
+		}
+		if !grep(append([]string{"cubbyhole/", "sys/", "identity/"}, filter...), entry.Path) {
+			continue
+		}
+		// oss end
 		resp.Data[entry.Path] = info
 	}
 
@@ -1181,7 +1209,6 @@ func (b *SystemBackend) handleReadMount(ctx context.Context, req *logical.Reques
 	path = sanitizePath(path)
 
 	entry := b.Core.router.MatchingMountEntry(ctx, path)
-
 	if entry == nil {
 		return logical.ErrorResponse("No secret engine mount at %s", path), nil
 	}
