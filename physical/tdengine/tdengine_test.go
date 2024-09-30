@@ -7,13 +7,13 @@ import (
 	log "github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
-	_ "github.com/taosdata/driver-go/v3/taosRestful"
+	_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
 func backend() *TDEngineBackend {
 	logger := logging.NewVaultLogger(log.Debug)
 	bi, err := NewTDEngineBackend(map[string]string{
-		"connection_url": "root:taosdata@http(localhost:6041)/",
+		"connection_url": "root:taosdata@tcp(localhost:6030)/openbao",
 	}, logger)
 	if err != nil {
 		panic(err)

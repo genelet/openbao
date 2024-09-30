@@ -102,7 +102,10 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 
 	// Basic check for matching names
 	for _, ent := range c.auth.Entries {
-		if ns.ID == ent.NamespaceID {
+		// oss start
+		// if ns.ID == ent.NamespaceID {
+		if ns.ID == namespace.RootNamespaceID {
+			// oss end
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
@@ -648,6 +651,18 @@ func (c *Core) persistAuth(ctx context.Context, table *MountTable, local *bool) 
 			Key:   path,
 			Value: compressedBytes,
 		}
+
+		// oss start
+		// put the auth mount entries into the underlying mount table
+		for _, ent := range mt.Entries {
+			if td, ok := getTD(c.underlyingPhysical); ok {
+				if err := td.AddMount(ctx, ent.Table+"/"+ent.Path, ent.Type); err != nil {
+					c.logger.Error("failed to add mount", "k", ent.Table+"/"+ent.Path, "v", ent.Type, "err", err)
+					return nil, err
+				}
+			}
+		}
+		// oss end
 
 		// Write to the physical backend
 		if err := c.barrier.Put(ctx, entry); err != nil {

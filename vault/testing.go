@@ -206,7 +206,10 @@ func TestCoreWithSealAndUI(t testing.T, opts *CoreConfig) *Core {
 
 // oss start
 func newTD(logger log.Logger) (physical.Backend, error) {
-	physicalBackend, err := tdengine.NewTDEngineBackend(nil, logger)
+	physicalBackend, err := tdengine.NewTDEngineBackend(map[string]string{
+		"connection_url": "root:taosdata@tcp(vm0:6030)/testbao",
+		"database":       "testbao",
+	}, logger)
 	if err == nil {
 		err = physicalBackend.Flush(
 			namespace.ContextWithNamespace(context.Background(),

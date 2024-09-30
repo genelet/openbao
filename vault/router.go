@@ -297,6 +297,29 @@ func (r *Router) Remount(ctx context.Context, src, dst string) error {
 		return fmt.Errorf("no mount at %q", src)
 	}
 
+	// oss start
+	// update the auth mount endpoint in the namespace-based mount table
+	if td, ok := getTD(r.underlyingPhysical); ok {
+		var typ string
+		if routeEntry, ok := raw.(*routeEntry); ok {
+			if mt := routeEntry.mountEntry; mt != nil {
+				typ = mt.Type
+			}
+		}
+		if typ == "" {
+			r.logger.Error("failed to find mount type", "src", src)
+			return fmt.Errorf("failed to find mount type")
+		}
+		if err = td.RemoveMount(ctx, src, typ); err == nil {
+			err = td.AddMount(ctx, dst, typ)
+		}
+		if err != nil {
+			r.logger.Error("failed to update auth mount table", "src", src, "dst", dst, "err", err)
+			return err
+		}
+	}
+	// oss end
+
 	// Update the mount point
 	r.root.Delete(src)
 	r.root.Insert(dst, raw)
@@ -397,15 +420,11 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 	// mount != "", means a match is found in the root namespace
 	// let's see if the path is found in that specific namespace
 	if td, ok := getTD(r.underlyingPhysical); ok {
-		typ, err := td.GetMount(ctx, path)
-		if err != nil {
-			r.logger.Error("failed to get mount", "err", err)
+		endpoint, err := td.ExistingMount(ctx, path, true)
+		if err != nil || !endpoint {
+			r.logger.Error("no mount", "path", path, "err", err)
 			return ""
 		}
-		if typ != "" {
-			return path
-		}
-		return typ
 	}
 	// oss end
 
@@ -497,12 +516,9 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 
 	// oss start
 	if td, ok := getTD(r.underlyingPhysical); ok {
-		typ, err := td.GetMount(ctx, path)
-		if err != nil {
-			r.logger.Error("failed to get mount", "err", err)
-			return nil
-		}
-		if typ == "" {
+		endpoint, err := td.ExistingMount(ctx, path, true)
+		if err != nil || !endpoint {
+			r.logger.Error("no mount", "path", path, "err", err)
 			return nil
 		}
 	}

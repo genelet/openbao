@@ -33,19 +33,18 @@ func main() {
 
 	name := "yoursecret"
 	kvSecret, err := kv2.Put(ctx, name, map[string]interface{}{
-		"username": "admin",
+		"username": "youradmin",
 		"password": "123456",
 	})
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("KV secret: %+v", kvSecret)
 
 	kvSecret, err = kv2.Get(ctx, name)
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("KV secret: %+v", kvSecret)
+	log.Printf("OK. Your secret: %+v", kvSecret)
 
 	err = kv2.Delete(ctx, name)
 	if err != nil {
@@ -53,7 +52,7 @@ func main() {
 	}
 
 	_, err = kv2.Put(ctx, name, map[string]interface{}{
-		"username": "admin7",
+		"username": "youradmin7",
 		"password": "1234567",
 	})
 	if err != nil {
@@ -64,12 +63,26 @@ func main() {
 	if err != nil {
 		log.Printf("KV secret: %+v", err)
 	}
-	log.Printf("KV yoursecret: %+v", kvSecret)
+	log.Printf("OK. Your secret: %+v", kvSecret)
 
 	// read secret from the root namespace
 	mySecret, err := kv2.Get(ctx, "mysecret")
 	if err != nil {
 		log.Printf("KV secret: %+v", err)
 	}
-	log.Printf("KV mysecret: %+v", mySecret)
+	log.Printf("!OK. My secret: %+v", mySecret)
+
+	client.SetNamespace("")
+	kv2 = client.KVv2(path)
+	mySecret, err = kv2.Get(ctx, "mysecret")
+	if err != nil {
+		log.Printf("KV secret: %+v", err)
+	}
+	log.Printf("OK. My secret: %+v", mySecret)
+
+	kvSecret, err = kv2.Get(ctx, name)
+	if err != nil {
+		log.Printf("KV secret: %+v", err)
+	}
+	log.Printf("!OK. Your secret: %+v", kvSecret)
 }

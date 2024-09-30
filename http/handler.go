@@ -422,7 +422,7 @@ func wrapGenericHandler(core *vault.Core, h http.Handler, props *vault.HandlerPr
 			nw.Header().Set(consts.NamespaceHeaderName, ns)
 		}
 
-		core.Logger().Trace("oss wrapGenericHandler ServeHTTP", "path", r.URL.Path, "method", r.Method, "ns", ns)
+		core.Logger().Trace("OSS wrapGenericHandler ServeHTTP", "path", r.URL.Path, "method", r.Method, "ns", ns)
 		h.ServeHTTP(nw, r)
 
 		cancelFunc()

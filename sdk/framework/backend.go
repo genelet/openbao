@@ -190,7 +190,7 @@ func (b *Backend) HandleExistenceCheck(ctx context.Context, req *logical.Request
 // HandleRequest is the logical.Backend implementation.
 func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*logical.Response, error) {
 	if b.logger != nil {
-		b.logger.Trace("framework backend start", "req.path", req.Path, "req.operation", req.Operation, "req.data", fmt.Sprintf("%#v", req.Data), "req.auth", req.Auth, "req.clientToken", req.ClientToken, "req.secret", req.Secret, "req.mount", req.MountPoint)
+		b.logger.Trace("OSS framework backend start", "req.path", req.Path, "req.operation", req.Operation, "req.data", fmt.Sprintf("%#v", req.Data), "req.auth", req.Auth, "req.clientToken", req.ClientToken, "req.secret", req.Secret, "req.mount", req.MountPoint)
 	}
 	b.once.Do(b.init)
 
@@ -318,7 +318,7 @@ func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*log
 	}
 
 	if b.logger != nil {
-		b.logger.Trace("framework backend end", "resp", resp)
+		b.logger.Trace("OSS framework backend end", "resp", resp)
 	}
 	return resp, nil
 }

@@ -77,7 +77,7 @@ func New(conf map[string]string, nsID, name string, defaultExpiration time.Durat
 	newconf["ns_path"] = name
 	newconf["table"] = nsID + "_" + name
 	if newconf["connection_url"] == "" {
-		newconf["connection_url"] = "root:taosdata@http(localhost:6041)/"
+		newconf["connection_url"] = "root:taosdata@tcp(localhost:6030)/opencache"
 	}
 
 	m, err := tdengine.NewTDEngineBackend(newconf, logger)
