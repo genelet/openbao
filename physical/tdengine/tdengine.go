@@ -277,6 +277,33 @@ func (m *TDEngineBackend) existing(statement string) (bool, error) {
 	return tableRows.Next(), nil
 }
 
+func (m *TDEngineBackend) DropAllTables() error {
+	defer metrics.MeasureSince([]string{"tdengine", "drop_all_tables"}, time.Now())
+
+	m.permitPool.Acquire()
+	defer m.permitPool.Release()
+
+	tableRows, err := m.db.Query(`SELECT table_name FROM information_schema.ins_tables WHERE db_name = "` + m.database + `"`)
+	if err != nil {
+		return err
+	}
+	defer tableRows.Close()
+
+	for tableRows.Next() {
+		var table string
+		err = tableRows.Scan(&table)
+		if err != nil {
+			return err
+		}
+
+		_, err = m.db.Exec("DROP TABLE IF EXISTS " + m.database + "." + table)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // CreateIfNotExists creates the table if it does not exist.
 func (m *TDEngineBackend) CreateIfNotExists(ctx context.Context, ns1 string) error {
 	ns0, err := namespace.FromContext(ctx)

@@ -318,7 +318,7 @@ func (b *Backend) HandleRequest(ctx context.Context, req *logical.Request) (*log
 	}
 
 	if b.logger != nil {
-		b.logger.Trace("OSS framework backend end", "resp", resp)
+		b.logger.Trace("OSS framework backend end")
 	}
 	return resp, nil
 }

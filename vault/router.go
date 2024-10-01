@@ -422,7 +422,7 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 	if td, ok := getTD(r.underlyingPhysical); ok {
 		endpoint, err := td.ExistingMount(ctx, path, true)
 		if err != nil || !endpoint {
-			r.logger.Error("no mount", "path", path, "err", err)
+			r.logger.Debug("no mount", "path", path, "err", err)
 			return ""
 		}
 	}
@@ -518,7 +518,7 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 	if td, ok := getTD(r.underlyingPhysical); ok {
 		endpoint, err := td.ExistingMount(ctx, path, true)
 		if err != nil || !endpoint {
-			r.logger.Error("no mount", "path", path, "err", err)
+			r.logger.Debug("no mount", "path", path, "err", err)
 			return nil
 		}
 	}

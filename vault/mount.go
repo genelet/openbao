@@ -603,11 +603,12 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	NamespaceByID(ctx, ns.ID, c)
 
 	// Basic check for matching names
+	// oss start
+	// pass is to check if the mount is already mounted in a namespace
+	// if true, we don't update c.mounts. Otherwise, we will get duplicate mounts in cache.
+	var pass bool
 	for _, ent := range c.mounts.Entries {
-		// oss start
-		// if ns.ID == ent.NamespaceID {
-		if ns.ID == namespace.RootNamespaceID {
-			// oss end
+		if ns.ID == ent.NamespaceID {
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
@@ -616,16 +617,18 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 			case strings.HasPrefix(entry.Path, ent.Path):
 				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
 			}
+		} else if !pass {
+			if ent.Table == entry.Table && ent.Path == entry.Path && ent.Type == entry.Type {
+				pass = true
+			}
 		}
+		// oss end
 	}
 
 	// Verify there are no conflicting mounts in the router
 	if match := c.router.MountConflict(ctx, entry.Path); match != "" {
 		return logical.CodedError(409, fmt.Sprintf("existing mount at %s", match))
 	}
-	// oss start
-	// we should force writing mount entry to the root namespace
-	// oss end
 
 	// Generate a new UUID and view
 	if entry.UUID == "" {
@@ -695,15 +698,19 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 
 	c.setCoreBackend(entry, backend, view)
 
-	newTable := c.mounts.shallowClone()
-	newTable.Entries = append(newTable.Entries, entry)
-	if updateStorage {
-		if err := c.persistMounts(ctx, newTable, &entry.Local); err != nil {
-			c.logger.Error("failed to update mount table", "error", err)
-			return logical.CodedError(500, "failed to update mount table")
+	// oss start
+	if !pass {
+		newTable := c.mounts.shallowClone()
+		newTable.Entries = append(newTable.Entries, entry)
+		if updateStorage {
+			if err := c.persistMounts(ctx, newTable, &entry.Local); err != nil {
+				c.logger.Error("failed to update mount table", "error", err)
+				return logical.CodedError(500, "failed to update mount table")
+			}
 		}
+		c.mounts = newTable
 	}
-	c.mounts = newTable
+	// oss end
 
 	if err := c.router.Mount(backend, entry.Path, entry, view); err != nil {
 		return err

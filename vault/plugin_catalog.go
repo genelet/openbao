@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/go-secure-stdlib/base62"
 	semver "github.com/hashicorp/go-version"
+	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/versions"
 	v4 "github.com/openbao/openbao/sdk/v2/database/dbplugin"
 	v5 "github.com/openbao/openbao/sdk/v2/database/dbplugin/v5"
@@ -806,7 +807,12 @@ func (c *PluginCatalog) Get(ctx context.Context, name string, pluginType consts.
 	return runner, err
 }
 
-func (c *PluginCatalog) get(ctx context.Context, name string, pluginType consts.PluginType, version string) (*pluginutil.PluginRunner, error) {
+// oss start
+// get gat catalog is always at the root level
+// func (c *PluginCatalog) get(ctx context.Context, name string, pluginType consts.PluginType, version string) (*pluginutil.PluginRunner, error) {
+func (c *PluginCatalog) get(_ context.Context, name string, pluginType consts.PluginType, version string) (*pluginutil.PluginRunner, error) {
+	ctx := namespace.RootContext(context.Background())
+	// oss end
 	// If the directory isn't set only look for builtin plugins.
 	if c.directory != "" {
 		// Look for external plugins in the barrier
