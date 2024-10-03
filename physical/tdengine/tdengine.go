@@ -873,7 +873,7 @@ func (m *TDEngineBackend) AddMount(ctx context.Context, mount, typ string) error
 		return fmt.Errorf("failed to mount %w", err)
 	}
 
-	m.logger.Debug("tdengine mount", "table", tname, "mount", mount)
+	m.logger.Debug("tdengine mount successful", "table", tname, "mount", mount)
 	return nil
 }
 

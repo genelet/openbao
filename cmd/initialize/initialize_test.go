@@ -37,12 +37,22 @@ func TestInitialize(t *testing.T) {
 	}
 
 	token := initResp.RootToken
-	tokenf, err := os.Create("/home/peter/.vault-token")
+	tokenf, err := os.Create("/home/peter/Working/root.token")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tokenf.Close()
 	_, err = tokenf.WriteString(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tokenf, err = os.Create("/home/peter/setup.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tokenf.Close()
+	_, err = tokenf.WriteString("export VAULT_TOKEN=" + token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +83,7 @@ func TestInitialize(t *testing.T) {
 }
 
 func getClient() (*api.Client, context.Context, error) {
-	bs, err := os.ReadFile("/home/peter/.vault-token")
+	bs, err := os.ReadFile("/home/peter/Working/root.token")
 	if err != nil {
 		return nil, nil, err
 	}

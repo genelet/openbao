@@ -34,7 +34,10 @@ func (b *versionedKVBackend) upgradeCheck(next framework.OperationFunc) framewor
 			// that are trying to access a mount immediately upon enabling be
 			// more likely to behave correctly since the operation should take
 			// almost no time.
-			time.Sleep(15 * time.Millisecond)
+			// oss start
+			// time.Sleep(15 * time.Millisecond)
+			time.Sleep(150 * time.Millisecond)
+			// oss end
 
 			if atomic.LoadUint32(b.upgrading) == 1 {
 				if b.perfSecondaryCheck() {

@@ -20,6 +20,7 @@ func TestKVRoot(t *testing.T) {
 		Type: "kv",
 		Options: map[string]string{
 			"version": "2",
+			"upgrade": "false",
 		},
 	})
 	if err != nil {
@@ -107,6 +108,7 @@ func TestKVRoot(t *testing.T) {
 		Type: "kv",
 		Options: map[string]string{
 			"version": "2",
+			"upgrade": "false",
 		},
 	})
 	if err != nil {
@@ -139,6 +141,7 @@ func TestKVNamespace(t *testing.T) {
 		Type: "kv",
 		Options: map[string]string{
 			"version": "2",
+			"upgrade": "false",
 		},
 	})
 	if err != nil {
@@ -226,6 +229,7 @@ func TestKVNamespace(t *testing.T) {
 		Type: "kv",
 		Options: map[string]string{
 			"version": "2",
+			"upgrade": "false",
 		},
 	})
 	if err != nil {
@@ -336,6 +340,7 @@ func TestKVNegative(t *testing.T) {
 				Type: "kv",
 				Options: map[string]string{
 					"version": "2",
+					"upgrade": "false",
 				},
 			}); err == nil {
 				err = sysNS.UnmountWithContext(ctx, path)
@@ -352,6 +357,7 @@ func TestKVNegative(t *testing.T) {
 				Type: "kv",
 				Options: map[string]string{
 					"version": "2",
+					"upgrade": "false",
 				},
 			}); err == nil {
 				err = sys.UnmountWithContext(ctx, path)

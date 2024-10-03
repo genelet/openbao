@@ -101,11 +101,10 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 	NamespaceByID(ctx, ns.ID, c)
 
 	// Basic check for matching names
+	// oss start
+	var pass bool
 	for _, ent := range c.auth.Entries {
-		// oss start
-		// if ns.ID == ent.NamespaceID {
-		if ns.ID == namespace.RootNamespaceID {
-			// oss end
+		if ns.ID == ent.NamespaceID {
 			switch {
 			// Existing is oauth/github/ new is oauth/ or
 			// existing is oauth/ and new is oauth/github/
@@ -113,6 +112,10 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 				fallthrough
 			case strings.HasPrefix(entry.Path, ent.Path):
 				return logical.CodedError(409, fmt.Sprintf("path is already in use at %s", ent.Path))
+			}
+		} else if !pass {
+			if ent.Table == entry.Table && ent.Path == entry.Path && ent.Type == entry.Type {
+				pass = true
 			}
 		}
 	}
@@ -122,8 +125,22 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 		return fmt.Errorf("token credential backend cannot be instantiated")
 	}
 
+	// oss start
+	// mount != "", means a match is found in the root namespace
+	// let's see if the path is found in that specific namespace
+	var pathInNamespace bool
+	if ns.ID != namespace.RootNamespaceID {
+		if td, ok := getTD(c.underlyingPhysical); ok {
+			pathInNamespace, err = td.ExistingMount(ctx, entry.Path, true)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// oss end
+
 	// Check for conflicts according to the router
-	if conflict := c.router.MountConflict(ctx, credentialRoutePrefix+entry.Path); conflict != "" {
+	if conflict := c.router.MountConflict(ctx, credentialRoutePrefix+entry.Path); conflict != "" && pathInNamespace {
 		return logical.CodedError(409, fmt.Sprintf("existing mount at %s", conflict))
 	}
 
@@ -188,16 +205,19 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 		}
 	}
 
-	// Update the auth table
-	newTable := c.auth.shallowClone()
-	newTable.Entries = append(newTable.Entries, entry)
-	if updateStorage {
-		if err := c.persistAuth(ctx, newTable, &entry.Local); err != nil {
-			return fmt.Errorf("failed to update auth table: %w", err)
+	// oss start
+	if !pass {
+		// Update the auth table
+		newTable := c.auth.shallowClone()
+		newTable.Entries = append(newTable.Entries, entry)
+		if updateStorage {
+			if err := c.persistAuth(ctx, newTable, &entry.Local); err != nil {
+				return fmt.Errorf("failed to update auth table: %w", err)
+			}
 		}
+		c.auth = newTable
 	}
-
-	c.auth = newTable
+	// oss end
 
 	if err := c.router.Mount(backend, credentialRoutePrefix+entry.Path, entry, view); err != nil {
 		return err
@@ -251,6 +271,26 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	if match == "" || ns.Path+path != match {
 		return fmt.Errorf("no matching mount")
 	}
+
+	// oss start
+	// c.router.MatchingMount would scan underlying for namespace match
+	// c.router.MatchingStorageByAPIPath is in root space only
+	// c.router.MatchingBackend is in root space only
+	// maybe we move this part to be before removeMountEntry ?
+	var arr []string
+	if td, ok := getTD(c.underlyingPhysical); ok {
+		if err = td.RemoveMount(ctx, path); err == nil {
+			arr, err = td.ListMounts(ctx, path)
+		}
+	}
+	if err != nil {
+		c.logger.Error("failed to remove mount entry for path being unmounted", "error", err, "path", path)
+		return err
+	}
+	if len(arr) > 0 {
+		return nil
+	}
+	// oss end
 
 	// Store the view for this backend
 	view := c.router.MatchingStorageByAPIPath(ctx, path)
@@ -651,18 +691,6 @@ func (c *Core) persistAuth(ctx context.Context, table *MountTable, local *bool) 
 			Key:   path,
 			Value: compressedBytes,
 		}
-
-		// oss start
-		// put the auth mount entries into the underlying mount table
-		for _, ent := range mt.Entries {
-			if td, ok := getTD(c.underlyingPhysical); ok {
-				if err := td.AddMount(ctx, ent.Table+"/"+ent.Path, ent.Type); err != nil {
-					c.logger.Error("failed to add mount", "k", ent.Table+"/"+ent.Path, "v", ent.Type, "err", err)
-					return nil, err
-				}
-			}
-		}
-		// oss end
 
 		// Write to the physical backend
 		if err := c.barrier.Put(ctx, entry); err != nil {

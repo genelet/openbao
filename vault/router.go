@@ -176,25 +176,20 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 
 	// oss start
 	originalPrefix := prefix
-	// oss end
 
 	// prepend namespace
 	prefix = mountEntry.Namespace().Path + prefix
 
 	// Check if this is a nested mount
-	// oss start
 	// if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
 	existing, _, ok := r.root.LongestPrefix(prefix)
 	if ok && existing != "" && mountEntry.NamespaceID == namespace.RootNamespaceID {
-		// oss end
 		return fmt.Errorf("cannot mount under existing mount %q", existing)
 	}
 
-	// oss start
 	if td, okk := getTD(r.underlyingPhysical); okk {
 		ctx := namespace.ContextWithNamespace(context.Background(), &namespace.Namespace{ID: mountEntry.NamespaceID})
 		if err := td.AddMount(ctx, originalPrefix, mountEntry.Type); err != nil {
-			r.logger.Error("failed to add mount", "err", err)
 			return err
 		}
 	}
@@ -416,18 +411,6 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 		return ""
 	}
 
-	// oss start
-	// mount != "", means a match is found in the root namespace
-	// let's see if the path is found in that specific namespace
-	if td, ok := getTD(r.underlyingPhysical); ok {
-		endpoint, err := td.ExistingMount(ctx, path, true)
-		if err != nil || !endpoint {
-			r.logger.Debug("no mount", "path", path, "err", err)
-			return ""
-		}
-	}
-	// oss end
-
 	return mount
 }
 
@@ -513,16 +496,6 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 	if !ok {
 		return nil
 	}
-
-	// oss start
-	if td, ok := getTD(r.underlyingPhysical); ok {
-		endpoint, err := td.ExistingMount(ctx, path, true)
-		if err != nil || !endpoint {
-			r.logger.Debug("no mount", "path", path, "err", err)
-			return nil
-		}
-	}
-	// oss end
 
 	return raw.(*routeEntry).mountEntry
 }
