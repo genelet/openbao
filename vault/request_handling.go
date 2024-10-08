@@ -703,9 +703,6 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		resp, auth, err = c.handleLoginRequest(ctx, req)
 		c.logger.Trace("OSS login request handled")
 	} else {
-		// oss start
-		// this is the major request. It uses physical.Cache
-		// oss end
 		c.logger.Trace("OSS handling non-login request")
 		resp, auth, err = c.handleRequest(ctx, req)
 		c.logger.Trace("OSS non-login request handled")

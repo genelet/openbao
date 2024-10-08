@@ -63,15 +63,13 @@ func TestGraphNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sys := client.Sys()
-	logical := client.Logical()
-
 	rootNS := "pname"
-	_, err = logical.WriteWithContext(ctx, "sys/namespaces/"+rootNS, nil)
+	clone, err := cloneClient(ctx, client, rootNS)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.SetNamespace(rootNS)
+
+	sys := clone.Sys()
 
 	path := "graph"
 	err = sys.MountWithContext(ctx, path, &api.MountInput{
@@ -116,7 +114,7 @@ func TestGraphNamespace(t *testing.T) {
 	}
 
 	client.SetNamespace("")
-	_, err = logical.DeleteWithContext(ctx, "sys/namespaces/"+rootNS)
+	_, err = client.Logical().DeleteWithContext(ctx, "sys/namespaces/"+rootNS)
 	if err != nil {
 		t.Fatal(err)
 	}

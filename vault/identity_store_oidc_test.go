@@ -1103,7 +1103,10 @@ func TestOIDC_PeriodicFunc(t *testing.T) {
 	for _, testSet := range testSets {
 		testSet := testSet
 		t.Run(testSet.namedKey.name, func(t *testing.T) {
-			t.Parallel()
+			// oss start
+			// can't test periodicFunc in parallel because it relies on backend storage entries
+			// t.Parallel()
+			// oss end
 
 			// Prepare a storage to run through periodicFunc
 			c, _, _ := TestCoreUnsealed(t)

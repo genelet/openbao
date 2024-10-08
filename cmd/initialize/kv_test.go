@@ -127,14 +127,12 @@ func TestKVNamespace(t *testing.T) {
 	}
 
 	pname := "pname"
-	sys := client.Sys()
-	logical := client.Logical()
-
-	_, err = logical.WriteWithContext(ctx, "sys/namespaces/"+pname, nil)
+	clone, err := cloneClient(ctx, client, pname)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.SetNamespace(pname)
+
+	sys := clone.Sys()
 
 	path := "secret"
 	err = sys.MountWithContext(ctx, path, &api.MountInput{
@@ -241,7 +239,7 @@ func TestKVNamespace(t *testing.T) {
 	}
 
 	client.SetNamespace("")
-	_, err = logical.DeleteWithContext(ctx, "sys/namespaces/"+pname)
+	_, err = client.Logical().DeleteWithContext(ctx, "sys/namespaces/"+pname)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,17 +279,11 @@ func TestKVNegative(t *testing.T) {
 	}
 
 	pname := "pname"
-	_, err = logical.WriteWithContext(ctx, "sys/namespaces/"+pname, nil)
+	clone, err := cloneClient(ctx, client, pname)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	clone, err := client.Clone()
-	if err != nil {
-		t.Fatal(err)
-	}
-	clone.SetToken(client.Token())
-	clone.SetNamespace(pname)
 	sysNS := clone.Sys()
 
 	// in child namespace

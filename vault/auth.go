@@ -120,16 +120,22 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 		}
 	}
 
-	// Ensure the token backend is a singleton
-	if entry.Type == mountTypeToken {
-		return fmt.Errorf("token credential backend cannot be instantiated")
-	}
-
+	/*
+		// Ensure the token backend is a singleton
+		if entry.Type == mountTypeToken {
+			return fmt.Errorf("token credential backend cannot be instantiated")
+		}
+	*/
 	// oss start
 	// mount != "", means a match is found in the root namespace
 	// let's see if the path is found in that specific namespace
 	var pathInNamespace bool
-	if ns.ID != namespace.RootNamespaceID {
+	if ns.ID == namespace.RootNamespaceID {
+		if entry.Type == mountTypeToken {
+			return fmt.Errorf("token credential backend cannot be instantiated")
+		}
+	} else {
+		// if ns.ID != namespace.RootNamespaceID {
 		if td, ok := getTD(c.underlyingPhysical); ok {
 			pathInNamespace, err = td.ExistingMount(ctx, entry.Path, true)
 			if err != nil {
@@ -246,9 +252,16 @@ func (c *Core) disableCredential(ctx context.Context, path string) error {
 	}
 
 	// Ensure the token backend is not affected
-	if path == "token/" {
+	// oss start
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	// if path == "token/" {
+	if path == "token/" && ns.ID == namespace.RootNamespaceID {
 		return fmt.Errorf("token credential backend cannot be disabled")
 	}
+	// oss end
 
 	// Disable credential internally
 	if err := c.disableCredentialInternal(ctx, path, MountTableUpdateStorage); err != nil {
