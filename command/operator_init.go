@@ -31,7 +31,6 @@ type OperatorInitCommand struct {
 	flagRecoveryShares    int
 	flagRecoveryThreshold int
 	flagRecoveryPGPKeys   []string
-	flagStoredShares      int
 }
 
 const (
@@ -49,18 +48,18 @@ func (c *OperatorInitCommand) Help() string {
 	helpText := `
 Usage: bao operator init [options]
 
-  Initializes a Vault server. Initialization is the process by which Vault's
-  storage backend is prepared to receive data. Since Vault servers share the
-  same storage backend in HA mode, you only need to initialize one Vault to
-  initialize the storage backend.
+  Initializes an OpenBao server. Initialization is the process by which
+  OpenBao's storage backend is prepared to receive data. Since OpenBao servers
+  share the same storage backend in HA mode, you only need to initialize one
+  OpenBao instance to initialize the storage backend.
 
-  During initialization, Vault generates an in-memory root key and applies
+  During initialization, OpenBao generates an in-memory root key and applies
   Shamir's secret sharing algorithm to disassemble that root key into a
   configuration number of key shares such that a configurable subset of those
   key shares must come together to regenerate the root key. These keys are
-  often called "unseal keys" in Vault's documentation.
+  often called "unseal keys" in OpenBao's documentation.
 
-  This command cannot be run against an already-initialized Vault cluster.
+  This command cannot be run against an already-initialized OpenBao cluster.
 
   Start initialization with the default options:
 
@@ -92,8 +91,8 @@ func (c *OperatorInitCommand) Flags() *FlagSets {
 		Target:  &c.flagStatus,
 		Default: false,
 		Usage: "Print the current initialization status. An exit code of 0 means " +
-			"the Vault is already initialized. An exit code of 1 means an error " +
-			"occurred. An exit code of 2 means the Vault is not initialized.",
+			"the OpenBao is already initialized. An exit code of 1 means an error " +
+			"occurred. An exit code of 2 means the OpenBao is not initialized.",
 	})
 
 	f.IntVar(&IntVar{
@@ -122,8 +121,7 @@ func (c *OperatorInitCommand) Flags() *FlagSets {
 			"public PGP keys OR a comma-separated list of Keybase usernames using " +
 			"the format \"keybase:<username>\". When supplied, the generated " +
 			"unseal keys will be encrypted and base64-encoded in the order " +
-			"specified in this list. The number of entries must match -key-shares, " +
-			"unless -stored-shares are used.",
+			"specified in this list. The number of entries must match -key-shares.",
 	})
 
 	f.VarFlag(&VarFlag{
@@ -135,13 +133,6 @@ func (c *OperatorInitCommand) Flags() *FlagSets {
 			"using the format \"keybase:<username>\". When supplied, the generated " +
 			"root token will be encrypted and base64-encoded with the given public " +
 			"key.",
-	})
-
-	f.IntVar(&IntVar{
-		Name:    "stored-shares",
-		Target:  &c.flagStoredShares,
-		Default: -1,
-		Usage:   "DEPRECATED: This flag does nothing. It will be removed in Vault 1.3.",
 	})
 
 	// Auto Unseal Options
@@ -196,9 +187,6 @@ func (c *OperatorInitCommand) Run(args []string) int {
 		return 1
 	}
 
-	if c.flagStoredShares != -1 {
-		c.UI.Warn("-stored-shares has no effect and will be removed in Vault 1.3.\n")
-	}
 	client, err := c.Client()
 	if err != nil {
 		c.UI.Error(err.Error())
@@ -314,7 +302,7 @@ func (c *OperatorInitCommand) init(client *api.Client, req *api.InitRequest) int
 		c.UI.Output("")
 		c.UI.Output(wrapAtLength(
 			"It is possible to generate new unseal keys, provided you have a quorum " +
-				"of existing unseal keys shares. See \"vault operator rekey\" for " +
+				"of existing unseal keys shares. See \"bao operator rekey\" for " +
 				"more information."))
 	} else {
 		c.UI.Output("")

@@ -61,10 +61,18 @@ const config: Config = {
           priority: 0.5,
           filename: 'sitemap.xml',
         },
-        blog: false,
+        blog: {
+          blogTitle: 'OpenBao Blog',
+          blogDescription: 'Official blog of the Bao Evangelism Taskforce (BET)',
+          path: "content/blog",
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
+		gtag: {
+		  trackingID: "GTM-MWH2V47T",
+		  anonymizeIP: true,
+		},
       } satisfies Preset.Options,
     ],
   ],
@@ -101,6 +109,11 @@ const config: Config = {
       },
       items: [
         {
+          to: "/blog/",
+          label: "Blog",
+          position: "left",
+        },
+        {
           to: "/docs/",
           label: "Docs",
           position: "left",
@@ -132,6 +145,14 @@ const config: Config = {
               label: "Charter",
               to: "pathname:///assets/OpenBao-Technical-Charter-Final-2024-05-08.pdf",
               target: "_blank",
+            },
+            {
+              label: "Policies",
+              to: "/docs/policies/",
+            },
+            {
+              label: "Contributing",
+              to: "/docs/contributing/",
             },
           ],
         },

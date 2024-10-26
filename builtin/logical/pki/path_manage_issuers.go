@@ -280,6 +280,20 @@ func (b *backend) pathImportIssuers(ctx context.Context, req *logical.Request, d
 		return logical.ErrorResponse("Can not import issuers until migration has completed"), nil
 	}
 
+	// If we have a transactional storage backend, let's use it. However,
+	// due to the limitation on transaction commit sizes, make sure not
+	// to use it for CRL rebuild.
+	originalStorage := req.Storage
+	if txnStorage, ok := req.Storage.(logical.TransactionalStorage); ok {
+		txn, err := txnStorage.BeginTx(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		defer txn.Rollback(ctx)
+		req.Storage = txn
+	}
+
 	var pemBundle string
 	var certificate string
 	rawPemBundle, bundleOk := data.GetOk("pem_bundle")
@@ -367,6 +381,7 @@ func (b *backend) pathImportIssuers(ctx context.Context, req *logical.Request, d
 	}
 
 	sc := b.makeStorageContext(ctx, req.Storage)
+	crlSc := b.makeStorageContext(ctx, originalStorage)
 
 	for keyIndex, keyPem := range keys {
 		// Handle import of private key.
@@ -407,25 +422,6 @@ func (b *backend) pathImportIssuers(ctx context.Context, req *logical.Request, d
 	}
 
 	if len(createdIssuers) > 0 {
-		warnings, err := b.crlBuilder.rebuild(sc, true)
-		if err != nil {
-			// Before returning, check if the error message includes the
-			// string "PSS". If so, it indicates we might've wanted to modify
-			// this issuer, so convert the error to a warning.
-			if strings.Contains(err.Error(), "PSS") || strings.Contains(err.Error(), "pss") {
-				err = fmt.Errorf("Rebuilding the CRL failed with a message relating to the PSS signature algorithm. This likely means the revocation_signature_algorithm needs to be set on the newly imported issuer(s) because a managed key supports only the PSS algorithm; by default PKCS#1v1.5 was used to build the CRLs. CRLs will not be generated until this has been addressed, however the import was successful. The original error is reproduced below:\n\n\t%w", err)
-			} else {
-				// Note to the caller that while this is an error, we did
-				// successfully import the issuers.
-				err = fmt.Errorf("Rebuilding the CRL failed. While this is indicative of a problem with the imported issuers (perhaps because of their revocation_signature_algorithm), they did import successfully and are now usable. It is strongly suggested to fix the CRL building errors before continuing. The original error is reproduced below:\n\n\t%w", err)
-			}
-
-			return nil, err
-		}
-		for index, warning := range warnings {
-			response.AddWarning(fmt.Sprintf("Warning %d during CRL rebuild: %v", index+1, warning))
-		}
-
 		var issuersWithKeys []string
 		for _, issuer := range createdIssuers {
 			if issuerKeyMap[issuer] != "" {
@@ -491,6 +487,41 @@ func (b *backend) pathImportIssuers(ctx context.Context, req *logical.Request, d
 	// tell the user that's probably next.
 	if entries, err := getGlobalAIAURLs(ctx, req.Storage); err == nil && len(entries.IssuingCertificates) == 0 && len(entries.CRLDistributionPoints) == 0 && len(entries.OCSPServers) == 0 {
 		response.AddWarning("This mount hasn't configured any authority information access (AIA) fields; this may make it harder for systems to find missing certificates in the chain or to validate revocation status of certificates. Consider updating /config/urls or the newly generated issuer with this information.")
+	}
+
+	// Commit our transaction if we created one!
+	if txn, ok := req.Storage.(logical.Transaction); ok && req.Storage != originalStorage {
+		if err := txn.Commit(ctx); err != nil {
+			return nil, err
+		}
+		req.Storage = originalStorage
+	}
+
+	// Lastly, rebuild the CRL: note that above, we might've potentially
+	// modified entries that CRL rebuild would read and modify itself, so
+	// the above transaction needs to be closed before we can do the CRL
+	// rebuild, otherwise we'll get commit failures.
+	if len(createdIssuers) > 0 {
+		warnings, err := b.crlBuilder.rebuild(crlSc, true)
+		if err != nil {
+			// Before returning, check if the error message includes the
+			// string "PSS". If so, it indicates we might've wanted to modify
+			// this issuer, so convert the error to a warning.
+			if strings.Contains(err.Error(), "PSS") || strings.Contains(err.Error(), "pss") {
+				err = fmt.Errorf("Rebuilding the CRL failed with a message relating to the PSS signature algorithm. This likely means the revocation_signature_algorithm needs to be set on the newly imported issuer(s) because a managed key supports only the PSS algorithm; by default PKCS#1v1.5 was used to build the CRLs. CRLs will not be generated until this has been addressed, however the import was successful. The original error is reproduced below:\n\n\t%w", err)
+			} else {
+				// Note to the caller that while this is an error, we did
+				// successfully import the issuers.
+				err = fmt.Errorf("Rebuilding the CRL failed. While this is indicative of a problem with the imported issuers (perhaps because of their revocation_signature_algorithm), they did import successfully and are now usable. It is strongly suggested to fix the CRL building errors before continuing. The original error is reproduced below:\n\n\t%w", err)
+			}
+
+			// Transition this to a warning rather than an error, as the
+			// issuers were created and committed.
+			response.AddWarning(err.Error())
+		}
+		for index, warning := range warnings {
+			response.AddWarning(fmt.Sprintf("Warning %d during CRL rebuild: %v", index+1, warning))
+		}
 	}
 
 	return response, nil

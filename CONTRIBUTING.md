@@ -15,6 +15,10 @@ talk to us! You can find out our thoughts and ensure that your contribution
 won't clash or be obviated by OpenBao's normal direction. A great way to do this
 is via the [GitHub Discussions][2].
 
+## Community Roles
+
+To view community roles or who holds those roles, see [MAINTAINERS.md](MAINTAINERS.md).
+
 ## Source-Available License Policy
 
 This policy prohibits the utilization or copy from any source that is protected
@@ -57,13 +61,13 @@ that lacks a sign-off to this agreement will not be accepted by the OpenBao proj
 
 ## Technical Steering Committee (TSC) Members
 
-| Member            | Email                               | GitHub                                     | Alternate                               | Company/Organization      | TSC Position |
-|-------------------|-------------------------------------|--------------------------------------------|-----------------------------------------|---------------------------|--------------|
-| Nathan Phelps     | naphelps@us.ibm.com                 | [@naphelps](https://github.com/naphelps)   |                                         | IBM                       | Chair        |
-| James Butcher     | james@iotechsys.com                 |                                            | Brad Corrion (brad@iotechsys.com)       | IOTech Systems            | Member       |
-| Alain Nochimowski | alain.Nochimowski@viaccess-orca.com |                                            | Dan Ghita (dan.ghita@viaccess-orca.com) | Viaccess-Orca             | Member       |
-| Julian Cassignol  | jcassignol@wallix.com               |                                            | Cristian Popi (cpopi@wallix.com)        | Wallix                    | Member       |
-
+| Member            | Email                               | GitHub                                     | Alternate                               | Company/Organization      | TSC Position       |
+|-------------------|-------------------------------------|--------------------------------------------|-----------------------------------------|---------------------------|--------------------|
+| Nathan Phelps     | naphelps@us.ibm.com                 | [@naphelps](https://github.com/naphelps)   |                                         | IBM                       | Member             |
+| James Butcher     | james@iotechsys.com                 |                                            | Brad Corrion (brad@iotechsys.com)       | IOTech Systems            | Member             |
+| Alain Nochimowski | alain.Nochimowski@viaccess-orca.com |                                            | Dan Ghita (dan.ghita@viaccess-orca.com) | Viaccess-Orca             | Member             |
+| Julian Cassignol  | jcassignol@wallix.com               |                                            | Cristian Popi (cpopi@wallix.com)        | Wallix                    | Member             |
+| Alexander Scheel  | ascheel@gitlab.com                  | [@cipherboy](https://github.com/cipherboy) | Jocelyn Eillis (jeillis@gitlab.com)     | GitLab                    | Chair              |
 
 ### OpenBao Working Groups
 
