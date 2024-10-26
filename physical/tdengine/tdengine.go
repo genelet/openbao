@@ -277,7 +277,16 @@ func (m *TDEngineBackend) existing(statement string) (bool, error) {
 	return tableRows.Next(), nil
 }
 
-func (m *TDEngineBackend) DropAllTables() error {
+func grep(names []string, name string) bool {
+	for _, str := range names {
+		if str == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *TDEngineBackend) DropAllTables(names ...string) error {
 	defer metrics.MeasureSince([]string{"tdengine", "drop_all_tables"}, time.Now())
 
 	m.permitPool.Acquire()
@@ -296,7 +305,11 @@ func (m *TDEngineBackend) DropAllTables() error {
 			return err
 		}
 
-		_, err = m.db.Exec("DROP TABLE IF EXISTS " + m.database + "." + table)
+		if grep(names, table) {
+			_, err = m.db.Exec("DELETE FROM " + m.database + "." + table)
+		} else {
+			_, err = m.db.Exec("DROP TABLE IF EXISTS " + m.database + "." + table)
+		}
 		if err != nil {
 			return err
 		}

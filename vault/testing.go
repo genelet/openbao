@@ -211,14 +211,16 @@ func newTD(logger log.Logger) (physical.Backend, error) {
 		"database":       "testbao",
 	}, logger)
 	if err == nil {
-		err = physicalBackend.Flush(
-			namespace.ContextWithNamespace(context.Background(),
-				&namespace.Namespace{
-					ID:             namespace.RootNamespace.ID,
-					CustomMetadata: map[string]string{},
-				},
-			),
-		)
+		if err = physicalBackend.DropAllTables("root", "mount"); err == nil {
+			err = physicalBackend.Flush(
+				namespace.ContextWithNamespace(context.Background(),
+					&namespace.Namespace{
+						ID:             namespace.RootNamespace.ID,
+						CustomMetadata: map[string]string{},
+					},
+				),
+			)
+		}
 	}
 
 	return physicalBackend, err

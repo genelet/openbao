@@ -13,7 +13,8 @@ import (
 func backend() *TDEngineBackend {
 	logger := logging.NewVaultLogger(log.Debug)
 	bi, err := NewTDEngineBackend(map[string]string{
-		"connection_url": "root:taosdata@tcp(localhost:6030)/openbao",
+		"connection_url": "root:taosdata@tcp(vm0:6030)/testbao",
+		"database":       "testbao",
 	}, logger)
 	if err != nil {
 		panic(err)

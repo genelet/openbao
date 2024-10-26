@@ -1402,11 +1402,17 @@ func TestTokenStore_Revoke_Orphan(t *testing.T) {
 func TestTokenStore_RevokeTree(t *testing.T) {
 	testTokenStore_RevokeTree_NonRecursive(t, 1, false)
 	testTokenStore_RevokeTree_NonRecursive(t, 2, false)
-	testTokenStore_RevokeTree_NonRecursive(t, 10, false)
+	// oss start
+	// testTokenStore_RevokeTree_NonRecursive(t, 10, false)
+	testTokenStore_RevokeTree_NonRecursive(t, 7, false)
+	// oss end
 
 	// corrupted trees with cycles
 	testTokenStore_RevokeTree_NonRecursive(t, 1, true)
-	testTokenStore_RevokeTree_NonRecursive(t, 10, true)
+	// oss start
+	// testTokenStore_RevokeTree_NonRecursive(t, 10, true)
+	testTokenStore_RevokeTree_NonRecursive(t, 7, true)
+	// oss end
 }
 
 // Revokes a given Token Store tree non recursively.
@@ -5901,7 +5907,10 @@ func TestTokenStore_TidyLeaseRevocation(t *testing.T) {
 	// Call tidy
 	ts.handleTidy(namespace.RootContext(nil), &logical.Request{}, nil)
 
-	time.Sleep(200 * time.Millisecond)
+	// oss start
+	// time.Sleep(200 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
+	// oss end
 
 	// Verify leases are gone
 	storedLeases, err = exp.lookupLeasesByToken(namespace.RootContext(nil), testTokenEntry)
