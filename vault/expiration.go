@@ -99,8 +99,8 @@ type pendingInfo struct {
 type ExpirationManager struct {
 	core       *Core
 	router     *Router
-	idView     *BarrierView
-	tokenView  *BarrierView
+	idView     BarrierView
+	tokenView  BarrierView
 	tokenStore *TokenStore
 	logger     log.Logger
 
@@ -326,7 +326,7 @@ func getNumExpirationWorkers(c *Core, l log.Logger) int {
 
 // NewExpirationManager creates a new ExpirationManager that is backed
 // using a given view, and uses the provided router for revocation.
-func NewExpirationManager(c *Core, view *BarrierView, e ExpireLeaseStrategy, logger log.Logger, detectDeadlocks bool) *ExpirationManager {
+func NewExpirationManager(c *Core, view BarrierView, e ExpireLeaseStrategy, logger log.Logger, detectDeadlocks bool) *ExpirationManager {
 	managerLogger := logger.Named("job-manager")
 	jobManager := fairshare.NewJobManager("expire", getNumExpirationWorkers(c, logger), managerLogger, c.metricSink)
 	jobManager.Start()
@@ -2152,15 +2152,6 @@ func (m *ExpirationManager) removeIndexByToken(ctx context.Context, le *leaseEnt
 		}
 		if tokenNS != nil {
 			saltCtx = namespace.ContextWithNamespace(ctx, tokenNS)
-		}
-
-		// Downgrade logic for old-style (V0) namespace leases that had its
-		// secondary index live in the root namespace. This reverts to the old
-		// behavior of looking for the secondary index on these leases in the
-		// root namespace to be cleaned up properly. We set it here because the
-		// old behavior used the namespace's token store salt for its saltCtx.
-		if le.Version < 1 {
-			tokenNS = namespace.RootNamespace
 		}
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/armon/go-metrics"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -150,10 +150,9 @@ var (
 // manage ACLs associated with them.
 type PolicyStore struct {
 	core    *Core
-	aclView *BarrierView
+	aclView BarrierView
 
-	tokenPoliciesLRU *lru.TwoQueueCache
-	egpLRU           *lru.TwoQueueCache
+	tokenPoliciesLRU *lru.TwoQueueCache[string, *Policy]
 
 	// This is used to ensure that writes to the store (acl) or to the egp
 	// path tree don't happen concurrently. We are okay reading stale data so
@@ -177,7 +176,7 @@ type PolicyEntry struct {
 
 // NewPolicyStore creates a new PolicyStore that is backed
 // using a given view. It used used to durable store and manage named policy.
-func NewPolicyStore(ctx context.Context, core *Core, baseView *BarrierView, system logical.SystemView, logger log.Logger) (*PolicyStore, error) {
+func NewPolicyStore(ctx context.Context, core *Core, baseView BarrierView, system logical.SystemView, logger log.Logger) (*PolicyStore, error) {
 	ps := &PolicyStore{
 		aclView:    baseView.SubView(policyACLSubPath),
 		modifyLock: new(sync.RWMutex),
@@ -186,10 +185,8 @@ func NewPolicyStore(ctx context.Context, core *Core, baseView *BarrierView, syst
 	}
 
 	if !system.CachingDisabled() {
-		cache, _ := lru.New2Q(policyCacheSize)
+		cache, _ := lru.New2Q[string, *Policy](policyCacheSize)
 		ps.tokenPoliciesLRU = cache
-		cache, _ = lru.New2Q(policyCacheSize)
-		ps.egpLRU = cache
 	}
 
 	aclView := ps.getACLView(namespace.RootNamespace)
@@ -381,8 +378,8 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	name = ps.sanitizeName(name)
 	index := ps.cacheKey(ns, name)
 
-	var cache *lru.TwoQueueCache
-	var view *BarrierView
+	var cache *lru.TwoQueueCache[string, *Policy]
+	var view BarrierView
 
 	switch policyType {
 	case PolicyTypeACL:
@@ -407,7 +404,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	if cache != nil {
 		// Check for cached policy
 		if raw, ok := cache.Get(index); ok {
-			return raw.(*Policy), nil
+			return raw, nil
 		}
 	}
 
@@ -431,7 +428,7 @@ func (ps *PolicyStore) switchedGetPolicy(ctx context.Context, name string, polic
 	// See if anything has added it since we got the lock
 	if cache != nil {
 		if raw, ok := cache.Get(index); ok {
-			return raw.(*Policy), nil
+			return raw, nil
 		}
 	}
 

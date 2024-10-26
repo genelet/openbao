@@ -139,8 +139,21 @@ func (b *versionedKVBackend) Upgrade(ctx context.Context, s logical.Storage) err
 			return nil
 		}
 
+		// Create a transaction if we can.
+		originalStorage := s
+		storage := s
+		if txnStorage, ok := storage.(logical.TransactionalStorage); ok {
+			txn, err := txnStorage.BeginTx(ctx)
+			if err != nil {
+				return err
+			}
+
+			defer txn.Rollback(ctx)
+			storage = txn
+		}
+
 		// Read the old data
-		data, err := s.Get(ctx, key)
+		data, err := storage.Get(ctx, key)
 		if err != nil {
 			return err
 		}
@@ -169,7 +182,7 @@ func (b *versionedKVBackend) Upgrade(ctx context.Context, s logical.Storage) err
 		}
 
 		// Store the version data
-		if err := s.Put(ctx, &logical.StorageEntry{
+		if err := storage.Put(ctx, &logical.StorageEntry{
 			Key:   versionKey,
 			Value: buf,
 		}); err != nil {
@@ -184,9 +197,18 @@ func (b *versionedKVBackend) Upgrade(ctx context.Context, s logical.Storage) err
 		}
 
 		// delete the old key
-		err = s.Delete(ctx, key)
+		err = storage.Delete(ctx, key)
 		if err != nil {
 			return err
+		}
+
+		// Commit our transaction if we created one! We're done making
+		// modifications to storage.
+		if txn, ok := storage.(logical.Transaction); ok && storage != originalStorage {
+			if err := txn.Commit(ctx); err != nil {
+				return err
+			}
+			storage = originalStorage
 		}
 
 		return nil

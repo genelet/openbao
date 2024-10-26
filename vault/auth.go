@@ -178,13 +178,13 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 	viewPath := entry.ViewPath()
 	view := NewBarrierView(c.barrier, viewPath)
 
-	origViewReadOnlyErr := view.getReadOnlyErr()
+	origViewReadOnlyErr := view.GetReadOnlyErr()
 
 	// Mark the view as read-only until the mounting is complete and
 	// ensure that it is reset after. This ensures that there will be no
 	// writes during the construction of the backend.
-	view.setReadOnlyErr(logical.ErrSetupReadOnly)
-	defer view.setReadOnlyErr(origViewReadOnlyErr)
+	view.SetReadOnlyErr(logical.ErrSetupReadOnly)
+	defer view.SetReadOnlyErr(origViewReadOnlyErr)
 
 	var backend logical.Backend
 	// Create the new backend
@@ -231,7 +231,7 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 
 	// restore the original readOnlyErr, so we can write to the view in
 	// Initialize() if necessary
-	view.setReadOnlyErr(origViewReadOnlyErr)
+	view.SetReadOnlyErr(origViewReadOnlyErr)
 	// initialize, using the core's active context.
 	err = backend.Initialize(c.activeContext, &logical.InitializationRequest{Storage: view})
 	if err != nil {
@@ -762,14 +762,14 @@ func (c *Core) setupCredentials(ctx context.Context) error {
 
 		view := NewBarrierView(c.barrier, viewPath)
 
-		origViewReadOnlyErr := view.getReadOnlyErr()
+		origViewReadOnlyErr := view.GetReadOnlyErr()
 
 		// Mark the view as read-only until the mounting is complete and
 		// ensure that it is reset after. This ensures that there will be no
 		// writes during the construction of the backend.
-		view.setReadOnlyErr(logical.ErrSetupReadOnly)
+		view.SetReadOnlyErr(logical.ErrSetupReadOnly)
 		if strutil.StrListContains(singletonMounts, entry.Type) {
-			defer view.setReadOnlyErr(origViewReadOnlyErr)
+			defer view.SetReadOnlyErr(origViewReadOnlyErr)
 		}
 
 		// Initialize the backend
@@ -870,7 +870,7 @@ func (c *Core) setupCredentials(ctx context.Context) error {
 				return
 			}
 			if !strutil.StrListContains(singletonMounts, localEntry.Type) {
-				view.setReadOnlyErr(origViewReadOnlyErr)
+				view.SetReadOnlyErr(origViewReadOnlyErr)
 			}
 
 			err := backend.Initialize(ctx, &logical.InitializationRequest{Storage: view})
