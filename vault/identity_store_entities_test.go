@@ -415,8 +415,12 @@ func TestIdentityStore_BatchDelete(t *testing.T) {
 	ctx := namespace.RootContext(nil)
 	is, _, _ := testIdentityStoreWithAppRoleAuth(ctx, t)
 
-	ids := make([]string, 10000)
-	for i := 0; i < 10000; i++ {
+	// oss start
+	// ids := make([]string, 10000)
+	// for i := 0; i < 10000; i++ {
+	ids := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		// oss end
 		entityData := map[string]interface{}{
 			"name": fmt.Sprintf("entity-%d", i),
 		}

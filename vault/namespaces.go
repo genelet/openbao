@@ -12,8 +12,13 @@ import (
 var NamespaceByID func(context.Context, string, *Core) (*namespace.Namespace, error) = namespaceByID
 
 func namespaceByID(ctx context.Context, nsID string, c *Core) (*namespace.Namespace, error) {
-	if nsID == namespace.RootNamespaceID {
-		return namespace.RootNamespace, nil
+	// oss start
+	if nsID != "" {
+		return &namespace.Namespace{
+			ID:             nsID,
+			CustomMetadata: map[string]string{},
+		}, nil
 	}
+	// oss end
 	return nil, namespace.ErrNoNamespace
 }

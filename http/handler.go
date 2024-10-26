@@ -93,6 +93,10 @@ var (
 		"/v1/sys/mounts/",
 		"/v1/sys/policy",
 		"/v1/sys/policy/",
+		// oss start
+		"/v1/sys/namespaces",
+		"/v1/sys/namespaces/",
+		// oss end
 		"/v1/sys/rekey/backup",
 		"/v1/sys/rekey/recovery-key-backup",
 		"/v1/sys/remount",
@@ -418,6 +422,7 @@ func wrapGenericHandler(core *vault.Core, h http.Handler, props *vault.HandlerPr
 			nw.Header().Set(consts.NamespaceHeaderName, ns)
 		}
 
+		core.Logger().Trace("OSS wrapGenericHandler ServeHTTP", "path", r.URL.Path, "method", r.Method, "ns", ns)
 		h.ServeHTTP(nw, r)
 
 		cancelFunc()

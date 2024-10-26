@@ -16,7 +16,6 @@ import (
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/sdk/v2/physical"
-	"github.com/openbao/openbao/sdk/v2/physical/inmem"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +23,10 @@ var logger = logging.NewVaultLogger(log.Trace)
 
 // mockBarrier returns a physical backend, security barrier, and master key
 func mockBarrier(t testing.TB) (physical.Backend, SecurityBarrier, []byte) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -41,7 +43,10 @@ func mockBarrier(t testing.TB) (physical.Backend, SecurityBarrier, []byte) {
 }
 
 func TestAESGCMBarrier_Basic(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -49,11 +54,17 @@ func TestAESGCMBarrier_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testBarrier(t, b.(*TransactionalAESGCMBarrier))
+	// oss start
+	// testBarrier(t, b.(*TransactionalAESGCMBarrier))
+	testBarrier(t, b.(*AESGCMBarrier))
+	// oss end
 }
 
 func TestAESGCMBarrier_Rotate(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -61,11 +72,17 @@ func TestAESGCMBarrier_Rotate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testBarrier_Rotate(t, b.(*TransactionalAESGCMBarrier))
+	// oss start
+	// testBarrier_Rotate(t, b.(*TransactionalAESGCMBarrier))
+	testBarrier_Rotate(t, b.(*AESGCMBarrier))
+	// oss end
 }
 
 func TestAESGCMBarrier_MissingRotateConfig(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -73,7 +90,10 @@ func TestAESGCMBarrier_MissingRotateConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Initialize and unseal
 	key, _ := b.GenerateKey(rand.Reader)
@@ -94,7 +114,10 @@ func TestAESGCMBarrier_MissingRotateConfig(t *testing.T) {
 }
 
 func TestAESGCMBarrier_Upgrade(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -106,11 +129,17 @@ func TestAESGCMBarrier_Upgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testBarrier_Upgrade(t, b1.(*TransactionalAESGCMBarrier), b2.(*TransactionalAESGCMBarrier))
+	// oss start
+	// testBarrier_Upgrade(t, b1.(*TransactionalAESGCMBarrier), b2.(*TransactionalAESGCMBarrier))
+	testBarrier_Upgrade(t, b1.(*AESGCMBarrier), b2.(*AESGCMBarrier))
+	// oss end
 }
 
 func TestAESGCMBarrier_Upgrade_Rekey(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -122,11 +151,17 @@ func TestAESGCMBarrier_Upgrade_Rekey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testBarrier_Upgrade_Rekey(t, b1.(*TransactionalAESGCMBarrier), b2.(*TransactionalAESGCMBarrier))
+	// oss start
+	// testBarrier_Upgrade_Rekey(t, b1.(*TransactionalAESGCMBarrier), b2.(*TransactionalAESGCMBarrier))
+	testBarrier_Upgrade_Rekey(t, b1.(*AESGCMBarrier), b2.(*AESGCMBarrier))
+	// oss end
 }
 
 func TestAESGCMBarrier_Rekey(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -134,13 +169,19 @@ func TestAESGCMBarrier_Rekey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	testBarrier_Rekey(t, b.(*TransactionalAESGCMBarrier))
+	// oss start
+	// testBarrier_Rekey(t, b.(*TransactionalAESGCMBarrier))
+	testBarrier_Rekey(t, b.(*AESGCMBarrier))
+	// oss end
 }
 
 // Test an upgrade from the old (0.1) barrier/init to the new
 // core/keyring style
 func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -148,7 +189,10 @@ func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Generate a barrier/init entry
 	encrypt, _ := b.GenerateKey(rand.Reader)
@@ -230,7 +274,10 @@ func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 
 // Verify data sent through is encrypted
 func TestAESGCMBarrier_Confidential(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -238,7 +285,10 @@ func TestAESGCMBarrier_Confidential(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Initialize and unseal
 	key, _ := b.GenerateKey(rand.Reader)
@@ -271,7 +321,10 @@ func TestAESGCMBarrier_Confidential(t *testing.T) {
 
 // Verify data sent through cannot be tampered with
 func TestAESGCMBarrier_Integrity(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -279,7 +332,10 @@ func TestAESGCMBarrier_Integrity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Initialize and unseal
 	key, _ := b.GenerateKey(rand.Reader)
@@ -310,7 +366,10 @@ func TestAESGCMBarrier_Integrity(t *testing.T) {
 
 // Verify data sent through cannot be moved
 func TestAESGCMBarrier_MoveIntegrityV1(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -318,7 +377,10 @@ func TestAESGCMBarrier_MoveIntegrityV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 	b.currentAESGCMVersionByte = AESGCMVersion1
 
 	// Initialize and unseal
@@ -355,7 +417,10 @@ func TestAESGCMBarrier_MoveIntegrityV1(t *testing.T) {
 }
 
 func TestAESGCMBarrier_MoveIntegrityV2(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -363,7 +428,10 @@ func TestAESGCMBarrier_MoveIntegrityV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 	b.currentAESGCMVersionByte = AESGCMVersion2
 
 	// Initialize and unseal
@@ -400,7 +468,10 @@ func TestAESGCMBarrier_MoveIntegrityV2(t *testing.T) {
 }
 
 func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -408,7 +479,10 @@ func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 	b.currentAESGCMVersionByte = AESGCMVersion1
 
 	// Initialize and unseal
@@ -440,7 +514,10 @@ func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b = sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b = sb.(*TransactionalAESGCMBarrier)
+	b = sb.(*AESGCMBarrier)
+	// oss end
 	b.currentAESGCMVersionByte = AESGCMVersion2
 
 	// Unseal
@@ -457,7 +534,10 @@ func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
 }
 
 func TestEncrypt_Unique(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -465,7 +545,10 @@ func TestEncrypt_Unique(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	key, _ := b.GenerateKey(rand.Reader)
 	b.Initialize(context.Background(), key, nil, rand.Reader)
@@ -494,7 +577,10 @@ func TestEncrypt_Unique(t *testing.T) {
 }
 
 func TestInitialize_KeyLength(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -502,7 +588,10 @@ func TestInitialize_KeyLength(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	long := []byte("ThisKeyDoesNotHaveTheRightLength!")
 	middle := []byte("ThisIsASecretKeyAndMore")
@@ -528,7 +617,10 @@ func TestInitialize_KeyLength(t *testing.T) {
 }
 
 func TestEncrypt_BarrierEncryptor(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -536,7 +628,10 @@ func TestEncrypt_BarrierEncryptor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Initialize and unseal
 	key, err := b.GenerateKey(rand.Reader)
@@ -565,7 +660,10 @@ func TestEncrypt_BarrierEncryptor(t *testing.T) {
 // Ensure Decrypt returns an error (rather than panic) when given a ciphertext
 // that is nil or too short
 func TestDecrypt_InvalidCipherLength(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -573,7 +671,10 @@ func TestDecrypt_InvalidCipherLength(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	key, err := b.GenerateKey(rand.Reader)
 	if err != nil {
@@ -599,7 +700,10 @@ func TestDecrypt_InvalidCipherLength(t *testing.T) {
 }
 
 func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -607,7 +711,10 @@ func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	b := sb.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b := sb.(*TransactionalAESGCMBarrier)
+	b := sb.(*AESGCMBarrier)
+	// oss end
 
 	// Initialize and unseal
 	key, _ := b.GenerateKey(rand.Reader)
@@ -631,7 +738,10 @@ func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
 		if err != nil {
 			t.Fatalf("err: %v", err)
 		}
-		b2 := sb2.(*TransactionalAESGCMBarrier)
+		// oss start
+		// b2 := sb2.(*TransactionalAESGCMBarrier)
+		b2 := sb2.(*AESGCMBarrier)
+		// oss end
 		b2.Unseal(context.Background(), key)
 		_, err = b2.Rotate(context.Background(), rand.Reader)
 		if err != nil {
@@ -679,7 +789,10 @@ func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
 }
 
 func TestBarrier_LegacyRotate(t *testing.T) {
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -687,7 +800,10 @@ func TestBarrier_LegacyRotate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	} // Initialize the barrier
-	b1 := sb1.(*TransactionalAESGCMBarrier)
+	// oss start
+	// b1 := sb1.(*TransactionalAESGCMBarrier)
+	b1 := sb1.(*AESGCMBarrier)
+	// oss end
 	key, _ := b1.GenerateKey(rand.Reader)
 	b1.Initialize(context.Background(), key, nil, rand.Reader)
 	err = b1.Unseal(context.Background(), key)
@@ -748,11 +864,17 @@ func TestBarrier_persistKeyring_Context(t *testing.T) {
 			t.Parallel()
 
 			// Set up barrier
-			backend, err := inmem.NewInmem(nil, corehelpers.NewTestLogger(t))
+			// oss start
+			// backend, err := inmem.NewInmem(nil, corehelpers.NewTestLogger(t))
+			backend, err := newTD(corehelpers.NewTestLogger(t))
+			// oss end
 			require.NoError(t, err)
 			security_barrier, err := NewAESGCMBarrier(backend)
 			require.NoError(t, err)
-			barrier := security_barrier.(*TransactionalAESGCMBarrier)
+			// oss start
+			// barrier := security_barrier.(*TransactionalAESGCMBarrier)
+			barrier := security_barrier.(*AESGCMBarrier)
+			// oss end
 			key, err := barrier.GenerateKey(rand.Reader)
 			require.NoError(t, err)
 			err = barrier.Initialize(context.Background(), key, nil, rand.Reader)

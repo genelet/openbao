@@ -146,6 +146,9 @@ func NewSystemBackend(core *Core, logger log.Logger) *SystemBackend {
 	b.Backend.Paths = append(b.Backend.Paths, b.lockedUserPaths()...)
 	b.Backend.Paths = append(b.Backend.Paths, b.leasePaths()...)
 	b.Backend.Paths = append(b.Backend.Paths, b.policyPaths()...)
+	// oss start
+	b.Backend.Paths = append(b.Backend.Paths, b.namespacePaths()...)
+	// oss end
 	b.Backend.Paths = append(b.Backend.Paths, b.wrappingPaths()...)
 	b.Backend.Paths = append(b.Backend.Paths, b.toolsPaths()...)
 	b.Backend.Paths = append(b.Backend.Paths, b.capabilitiesPaths()...)
@@ -930,6 +933,21 @@ func (b *SystemBackend) mountInfo(ctx context.Context, entry *MountEntry) map[st
 	return info
 }
 
+// oss start
+func grep(list []string, single string) bool {
+	if list == nil {
+		return false
+	}
+	for _, item := range list {
+		if item == single {
+			return true
+		}
+	}
+	return false
+}
+
+// oss end
+
 // handleMountTable handles the "mounts" endpoint to provide the mount table
 func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	ns, err := namespace.FromContext(ctx)
@@ -944,6 +962,15 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 		Data: make(map[string]interface{}),
 	}
 
+	// oss start
+	var filter []string
+	if td, ok := getTD(b.Core.underlyingPhysical); ok {
+		if filter, err = td.ListMounts(ctx); err != nil {
+			return nil, err
+		}
+	}
+	// oss end
+
 	for _, entry := range b.Core.mounts.Entries {
 		// Only show entries for current namespace
 		if entry.Namespace().Path != ns.Path {
@@ -952,7 +979,11 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 
 		// Populate mount info
 		info := b.mountInfo(ctx, entry)
-
+		// oss start
+		if !grep(append([]string{"cubbyhole/", "sys/", "identity/"}, filter...), entry.Path) {
+			continue
+		}
+		// oss end
 		resp.Data[entry.Path] = info
 	}
 
@@ -961,8 +992,8 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 
 // handleMount is used to mount a new path
 func (b *SystemBackend) handleMount(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	b.logger.Trace("111111111111", "data", data)
 	local := data.Get("local").(bool)
-
 	// Get all the options
 	path := data.Get("path").(string)
 	path = sanitizePath(path)
@@ -1178,7 +1209,6 @@ func (b *SystemBackend) handleReadMount(ctx context.Context, req *logical.Reques
 	path = sanitizePath(path)
 
 	entry := b.Core.router.MatchingMountEntry(ctx, path)
-
 	if entry == nil {
 		return logical.ErrorResponse("No secret engine mount at %s", path), nil
 	}
@@ -2302,11 +2332,24 @@ func (b *SystemBackend) handleAuthTable(ctx context.Context, req *logical.Reques
 		Data: make(map[string]interface{}),
 	}
 
+	// oss start
+	var arr []string
+	if ns.ID != namespace.RootNamespaceID {
+		if td, ok := getTD(b.Core.underlyingPhysical); ok {
+			arr, err = td.ListMounts(ctx)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	for _, entry := range b.Core.auth.Entries {
 		// Only show entries for current namespace
-		if entry.Namespace().Path != ns.Path {
+		// if entry.Namespace().Path != ns.Path {
+		if (entry.NamespaceID == ns.ID && entry.Namespace().Path != ns.Path) ||
+			(entry.NamespaceID != ns.ID && !grep(arr, "auth/"+entry.Path)) {
 			continue
 		}
+		// oss end
 
 		info := b.mountInfo(ctx, entry)
 		resp.Data[entry.Path] = info
@@ -2329,7 +2372,10 @@ func (b *SystemBackend) handleReadAuth(ctx context.Context, req *logical.Request
 
 	for _, entry := range b.Core.auth.Entries {
 		// Only show entry for current namespace
-		if entry.Namespace().Path != ns.Path || entry.Path != path {
+		// oss start
+		// if entry.Namespace().Path != ns.Path || entry.Path != path {
+		if entry.NamespaceID != ns.ID || entry.Namespace().Path != ns.Path || entry.Path != path {
+			// oss end
 			continue
 		}
 
@@ -2369,6 +2415,7 @@ func expandStringValsWithCommas(configMap map[string]interface{}) error {
 
 // handleEnableAuth is used to enable a new credential backend
 func (b *SystemBackend) handleEnableAuth(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	b.logger.Trace("22222222", "data", data)
 	local := data.Get("local").(bool)
 
 	// Get all the options

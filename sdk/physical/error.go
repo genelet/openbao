@@ -46,6 +46,13 @@ func NewErrorInjector(b Backend, errorPercent int, logger log.Logger) *ErrorInje
 	}
 }
 
+// oss start
+func (e *ErrorInjector) GetBackend() Backend {
+	return e.backend
+}
+
+// oss end
+
 func (e *ErrorInjector) SetErrorPercentage(p int) {
 	e.errorPercent = p
 }

@@ -550,6 +550,13 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 	// as it is depended on by some functionality (e.g. quotas)
 	req.MountPoint = c.router.MatchingMount(ctx, req.Path)
 
+	// oss start
+	// PopulateTokenEntry calls LookupToken. The later uses 2 caches:
+	// 1) salt is cached in the token store. ts.SaltID will call t.Salt.
+	// this line in ts.Salt gets salt:
+	// salt, err := salt.NewSalt(ctx, ts.baseView(ns), &salt.Config{
+	// 2) BarrierView's storage will use physical.Cache
+	// oss end
 	err = c.PopulateTokenEntry(ctx, req)
 	if err != nil {
 		return nil, err
@@ -692,9 +699,13 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 
 	var auth *logical.Auth
 	if c.isLoginRequest(ctx, req) {
+		c.logger.Trace("OSS handling login request")
 		resp, auth, err = c.handleLoginRequest(ctx, req)
+		c.logger.Trace("OSS login request handled")
 	} else {
+		c.logger.Trace("OSS handling non-login request")
 		resp, auth, err = c.handleRequest(ctx, req)
+		c.logger.Trace("OSS non-login request handled")
 	}
 
 	if err == nil && c.requestResponseCallback != nil {
@@ -1724,6 +1735,9 @@ func (c *Core) getLoginUserInfoKey(ctx context.Context, mountEntry *MountEntry, 
 // Auth types userpass, ldap and approle support this feature
 // precedence: environment var setting >> auth tune setting >> config file setting >> default (enabled)
 func (c *Core) isUserLockoutDisabled(mountEntry *MountEntry) (bool, error) {
+	if mountEntry == nil {
+		return true, nil
+	}
 	if !strutil.StrListContains(configutil.GetSupportedUserLockoutsAuthMethods(), mountEntry.Type) {
 		return true, nil
 	}

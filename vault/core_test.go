@@ -315,7 +315,10 @@ func TestNewCore_configureListeners(t *testing.T) {
 
 			// We need to init some values ourselves, usually CreateCore does this for us.
 			logger := corehelpers.NewTestLogger(t)
-			backend, err := inmem.NewInmem(nil, logger)
+			// oss start
+			// backend, err := inmem.NewInmem(nil, logger)
+			backend, err := newTD(logger)
+			// oss end
 			require.NoError(t, err)
 			storage := &logical.InmemStorage{}
 			core := &Core{
@@ -340,8 +343,10 @@ func TestNewCore_configureListeners(t *testing.T) {
 
 func TestNewCore_badRedirectAddr(t *testing.T) {
 	logger = logging.NewVaultLogger(log.Trace)
-
-	inm, err := inmem.NewInmem(nil, logger)
+	// oss start
+	// inm, err := inmem.NewInmem(nil, logger)
+	inm, err := newTD(logger)
+	// oss end
 	if err != nil {
 		t.Fatal(err)
 	}

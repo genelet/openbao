@@ -46,6 +46,7 @@ import (
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/osutil"
 	"github.com/openbao/openbao/physical/raft"
+	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/helper/certutil"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
@@ -373,6 +374,11 @@ type Core struct {
 
 	// policy store is used to manage named ACL policies
 	policyStore *PolicyStore
+
+	// oss start
+	// namespace Store is used to manage namespaces
+	namespaceStore *NamespaceStore
+	// oss end
 
 	// token store is used to manage authentication tokens
 	tokenStore *TokenStore
@@ -965,6 +971,9 @@ func CreateCore(conf *CoreConfig) (*Core, error) {
 
 	c.allLoggers = append(c.allLoggers, c.logger)
 
+	// oss start
+	c.router.underlyingPhysical = c.underlyingPhysical
+	// oss end
 	c.router.logger = c.logger.Named("router")
 	c.allLoggers = append(c.allLoggers, c.router.logger)
 
@@ -1489,6 +1498,7 @@ func (c *Core) unsealFragment(key []byte, migrate bool) error {
 	if err != nil {
 		return err
 	}
+
 	return c.unsealInternal(ctx, masterKey)
 }
 
@@ -2248,6 +2258,21 @@ func (s standardUnsealStrategy) unseal(ctx context.Context, logger log.Logger, c
 	if err := c.setupPolicyStore(ctx); err != nil {
 		return err
 	}
+	// oss start
+	switch t := c.underlyingPhysical.(type) {
+	case *tdengine.TDEngineBackend:
+		if err := c.setupNamespaceStore(ctx); err != nil {
+			return err
+		}
+	case *physical.ErrorInjector:
+		if _, ok := t.GetBackend().(*tdengine.TDEngineBackend); ok {
+			if err := c.setupNamespaceStore(ctx); err != nil {
+				return err
+			}
+		}
+	default:
+	}
+	// oss end
 	if err := c.loadCORSConfig(ctx); err != nil {
 		return err
 	}
@@ -2461,6 +2486,11 @@ func (c *Core) preSeal() error {
 	if err := c.teardownPolicyStore(); err != nil {
 		result = multierror.Append(result, fmt.Errorf("error tearing down policy store: %w", err))
 	}
+	// oss start
+	if err := c.teardownNamespaceStore(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("error tearing down namespaces store: %w", err))
+	}
+	// oss end
 	if err := c.stopRollback(); err != nil {
 		result = multierror.Append(result, fmt.Errorf("error stopping rollback: %w", err))
 	}

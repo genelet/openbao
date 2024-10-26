@@ -20,6 +20,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/salt"
 	"github.com/openbao/openbao/sdk/v2/logical"
+	"github.com/openbao/openbao/sdk/v2/physical"
 )
 
 var deniedPassthroughRequestHeaders = []string{
@@ -41,6 +42,9 @@ type Router struct {
 	// For example, logical/uuid1/foobar -> secrets/ (kv backend) + foobar
 	storagePrefix *radix.Tree
 	logger        hclog.Logger
+	// oss start
+	underlyingPhysical physical.Backend
+	// oss end
 }
 
 // NewRouter returns a new router
@@ -170,13 +174,30 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 	r.l.Lock()
 	defer r.l.Unlock()
 
+	// oss start
+	originalPrefix := prefix
+
 	// prepend namespace
 	prefix = mountEntry.Namespace().Path + prefix
 
 	// Check if this is a nested mount
-	if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
+	// if existing, _, ok := r.root.LongestPrefix(prefix); ok && existing != "" {
+	existing, _, ok := r.root.LongestPrefix(prefix)
+	if ok && existing != "" && mountEntry.NamespaceID == namespace.RootNamespaceID {
 		return fmt.Errorf("cannot mount under existing mount %q", existing)
 	}
+
+	if td, okk := getTD(r.underlyingPhysical); okk {
+		ctx := namespace.ContextWithNamespace(context.Background(), &namespace.Namespace{ID: mountEntry.NamespaceID})
+		if err := td.AddMount(ctx, originalPrefix, mountEntry.Type); err != nil {
+			return err
+		}
+	}
+
+	if ok && existing != "" {
+		return nil
+	}
+	// oss end
 
 	// Build the paths
 	paths := new(logical.Paths)
@@ -270,6 +291,29 @@ func (r *Router) Remount(ctx context.Context, src, dst string) error {
 	if !ok {
 		return fmt.Errorf("no mount at %q", src)
 	}
+
+	// oss start
+	// update the auth mount endpoint in the namespace-based mount table
+	if td, ok := getTD(r.underlyingPhysical); ok {
+		var typ string
+		if routeEntry, ok := raw.(*routeEntry); ok {
+			if mt := routeEntry.mountEntry; mt != nil {
+				typ = mt.Type
+			}
+		}
+		if typ == "" {
+			r.logger.Error("failed to find mount type", "src", src)
+			return fmt.Errorf("failed to find mount type")
+		}
+		if err = td.RemoveMount(ctx, src, typ); err == nil {
+			err = td.AddMount(ctx, dst, typ)
+		}
+		if err != nil {
+			r.logger.Error("failed to update auth mount table", "src", src, "dst", dst, "err", err)
+			return err
+		}
+	}
+	// oss end
 
 	// Update the mount point
 	r.root.Delete(src)
@@ -366,6 +410,7 @@ func (r *Router) matchingMountInternal(ctx context.Context, path string) string 
 	if !ok {
 		return ""
 	}
+
 	return mount
 }
 
@@ -396,9 +441,12 @@ func (r *Router) MountConflict(ctx context.Context, path string) string {
 	if exactMatch := r.matchingMountInternal(ctx, path); exactMatch != "" {
 		return exactMatch
 	}
-	if prefixMatch := r.matchingPrefixInternal(ctx, path); prefixMatch != "" {
-		return prefixMatch
-	}
+	// oss start
+	// "like" is used in matchingMountInternal
+	// if prefixMatch := r.matchingPrefixInternal(ctx, path); prefixMatch != "" {
+	// 	return prefixMatch
+	//}
+	// oss end
 	return ""
 }
 
@@ -448,6 +496,7 @@ func (r *Router) MatchingMountEntry(ctx context.Context, path string) *MountEntr
 	if !ok {
 		return nil
 	}
+
 	return raw.(*routeEntry).mountEntry
 }
 
