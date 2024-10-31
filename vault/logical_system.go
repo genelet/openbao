@@ -992,7 +992,6 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 
 // handleMount is used to mount a new path
 func (b *SystemBackend) handleMount(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	b.logger.Trace("111111111111", "data", data)
 	local := data.Get("local").(bool)
 	// Get all the options
 	path := data.Get("path").(string)
@@ -2415,7 +2414,6 @@ func expandStringValsWithCommas(configMap map[string]interface{}) error {
 
 // handleEnableAuth is used to enable a new credential backend
 func (b *SystemBackend) handleEnableAuth(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	b.logger.Trace("22222222", "data", data)
 	local := data.Get("local").(bool)
 
 	// Get all the options

@@ -273,7 +273,7 @@ func (b *SystemBackend) handleNamespacesDelete() framework.OperationFunc {
 // NamespaceStore is used to provide durable storage of namespace
 type NamespaceStore struct {
 	core    *Core
-	aclView *BarrierView
+	aclView BarrierView
 
 	// This is used to ensure that writes to the store (acl) or to the egp
 	// path tree don't happen concurrently. We are okay reading stale data so
@@ -291,7 +291,7 @@ type NamespaceEntry struct {
 
 // NewNamespaceStore creates a new NamespaceStore that is backed
 // using a given view. It used used to durable store and manage named namespace.
-func NewNamespaceStore(ctx context.Context, core *Core, baseView *BarrierView, system logical.SystemView, logger hclog.Logger) (*NamespaceStore, error) {
+func NewNamespaceStore(ctx context.Context, core *Core, baseView BarrierView, system logical.SystemView, logger hclog.Logger) (*NamespaceStore, error) {
 	ps := &NamespaceStore{
 		aclView:    baseView.SubView(namespaceSubPath),
 		modifyLock: new(sync.RWMutex),
