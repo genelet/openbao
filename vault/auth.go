@@ -126,7 +126,6 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 			return fmt.Errorf("token credential backend cannot be instantiated")
 		}
 	*/
-	// oss start
 	// mount != "", means a match is found in the root namespace
 	// let's see if the path is found in that specific namespace
 	var pathInNamespace bool
@@ -136,7 +135,7 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 		}
 	} else {
 		// if ns.ID != namespace.RootNamespaceID {
-		if td, ok := getTD(c.underlyingPhysical); ok {
+		if td, ok := physicalToMountable(c.underlyingPhysical); ok {
 			pathInNamespace, err = td.ExistingMount(ctx, entry.Path, true)
 			if err != nil {
 				return err
@@ -291,7 +290,7 @@ func (c *Core) disableCredentialInternal(ctx context.Context, path string, updat
 	// c.router.MatchingBackend is in root space only
 	// maybe we move this part to be before removeMountEntry ?
 	var arr []string
-	if td, ok := getTD(c.underlyingPhysical); ok {
+	if td, ok := physicalToMountable(c.underlyingPhysical); ok {
 		if err = td.RemoveMount(ctx, path); err == nil {
 			arr, err = td.ListMounts(ctx, path)
 		}

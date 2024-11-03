@@ -630,7 +630,7 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 	// let's see if the path is found in that specific namespace
 	var pathInNamespace bool
 	if ns.ID != namespace.RootNamespaceID {
-		if td, ok := getTD(c.underlyingPhysical); ok {
+		if td, ok := physicalToMountable(c.underlyingPhysical); ok {
 			pathInNamespace, err = td.ExistingMount(ctx, entry.Path, true)
 			if err != nil {
 				return err
@@ -824,7 +824,7 @@ func (c *Core) unmountInternal(ctx context.Context, path string, updateStorage b
 	// oss start
 	// maybe we move this part to be before removeMountEntry ?
 	var arr []string
-	if td, ok := getTD(c.underlyingPhysical); ok {
+	if td, ok := physicalToMountable(c.underlyingPhysical); ok {
 		if err = td.RemoveMount(ctx, path); err == nil {
 			arr, err = td.ListMounts(ctx, path)
 		}
@@ -1085,27 +1085,27 @@ func (c *Core) remountSecretsEngine(ctx context.Context, src, dst namespace.Moun
 	srcRelativePath := src.GetRelativePath(ns)
 	dstRelativePath := dst.GetRelativePath(ns)
 	// oss start
-	var srcPathInNamespace bool
-	var dstPathInNamespace bool
-	if td, ok := getTD(c.underlyingPhysical); ok {
-		srcPathInNamespace, err = td.ExistingMount(ctx, srcRelativePath, true)
-		if err != nil {
+	if td, ok := physicalToMountable(c.underlyingPhysical); ok {
+		if srcPathInNamespace, err := td.ExistingMount(ctx, srcRelativePath, true); err != nil {
 			return err
+		} else if !srcPathInNamespace {
+			return fmt.Errorf("source path not found at %q", src.Namespace.Path+src.MountPath)
 		}
-		dstPathInNamespace, err = td.ExistingMount(ctx, dstRelativePath, true)
-		if err != nil {
+		if dstPathInNamespace, err := td.ExistingMount(ctx, dstRelativePath, true); err != nil {
 			return err
+		} else if dstPathInNamespace {
+			return fmt.Errorf("destination path already exists at %q", dst.Namespace.Path+dst.MountPath)
 		}
 	}
 	// oss end
 
 	// Verify exact match of the route
 	srcMatch := c.router.MatchingMountEntry(ctx, srcRelativePath)
-	if srcMatch == nil || !srcPathInNamespace {
+	if srcMatch == nil {
 		return fmt.Errorf("no matching mount at %q", src.Namespace.Path+src.MountPath)
 	}
 
-	if match := c.router.MountConflict(ctx, dstRelativePath); match != "" && dstPathInNamespace {
+	if match := c.router.MountConflict(ctx, dstRelativePath); match != "" {
 		return fmt.Errorf("path in use at %q", match)
 	}
 

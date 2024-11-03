@@ -10,11 +10,9 @@ import (
 
 	log "github.com/hashicorp/go-hclog"
 	wrapping "github.com/openbao/go-kms-wrapping/v2"
+	"github.com/openbao/openbao/physical/env"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	// oss start
-	//"github.com/openbao/openbao/sdk/v2/physical/inmem"
-	// oss end
 )
 
 func TestCore_Init(t *testing.T) {
@@ -31,7 +29,7 @@ func testCore_NewTestCoreLicensing(t *testing.T, seal Seal) (*Core, *CoreConfig)
 
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatal(err)

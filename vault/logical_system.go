@@ -964,7 +964,7 @@ func (b *SystemBackend) handleMountTable(ctx context.Context, req *logical.Reque
 
 	// oss start
 	var filter []string
-	if td, ok := getTD(b.Core.underlyingPhysical); ok {
+	if td, ok := physicalToMountable(b.Core.underlyingPhysical); ok {
 		if filter, err = td.ListMounts(ctx); err != nil {
 			return nil, err
 		}
@@ -2334,7 +2334,7 @@ func (b *SystemBackend) handleAuthTable(ctx context.Context, req *logical.Reques
 	// oss start
 	var arr []string
 	if ns.ID != namespace.RootNamespaceID {
-		if td, ok := getTD(b.Core.underlyingPhysical); ok {
+		if td, ok := physicalToMountable(b.Core.underlyingPhysical); ok {
 			arr, err = td.ListMounts(ctx)
 			if err != nil {
 				return nil, err

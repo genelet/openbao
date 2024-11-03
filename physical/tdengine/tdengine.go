@@ -54,7 +54,8 @@ const (
 
 // Verify TDEngineBackend satisfies the correct interfaces
 var (
-	_ physical.Backend = (*TDEngineBackend)(nil)
+	_ physical.Backend   = (*TDEngineBackend)(nil)
+	_ physical.Mountable = (*TDEngineBackend)(nil)
 )
 
 // TDEngineBackend is a physical backend that stores data

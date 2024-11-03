@@ -4,7 +4,6 @@
 package vault_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -13,11 +12,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/helper/testhelpers/corehelpers"
-	"github.com/openbao/openbao/physical/tdengine"
+	"github.com/openbao/openbao/physical/env"
 
-	// oss start
-	"github.com/openbao/openbao/helper/namespace"
-	// oss end
 	vaulthttp "github.com/openbao/openbao/http"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -25,30 +21,6 @@ import (
 	"github.com/openbao/openbao/vault"
 	"github.com/openbao/openbao/version"
 )
-
-// oss start
-func newTD(logger hclog.Logger) (physical.Backend, error) {
-	physicalBackend, err := tdengine.NewTDEngineBackend(map[string]string{
-		"connection_url": "root:taosdata@tcp(vm0:6030)/testbao",
-		"database":       "testbao",
-	}, logger)
-	if err == nil {
-		if err = physicalBackend.DropAllTables("root", "mount"); err == nil {
-			err = physicalBackend.Flush(
-				namespace.ContextWithNamespace(context.Background(),
-					&namespace.Namespace{
-						ID:             namespace.RootNamespace.ID,
-						CustomMetadata: map[string]string{},
-					},
-				),
-			)
-		}
-	}
-
-	return physicalBackend, err
-}
-
-// oss end
 
 func TestSystemBackend_InternalUIResultantACL(t *testing.T) {
 	t.Parallel()
@@ -180,7 +152,7 @@ func TestSystemBackend_HAStatus(t *testing.T) {
 	logger := logging.NewVaultLogger(hclog.Trace)
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatal(err)

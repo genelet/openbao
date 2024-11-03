@@ -35,6 +35,7 @@ import (
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/testhelpers/corehelpers"
 	"github.com/openbao/openbao/internalshared/configutil"
+	"github.com/openbao/openbao/physical/env"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
@@ -317,7 +318,7 @@ func TestNewCore_configureListeners(t *testing.T) {
 			logger := corehelpers.NewTestLogger(t)
 			// oss start
 			// backend, err := inmem.NewInmem(nil, logger)
-			backend, err := newTD(logger)
+			backend, err := env.DefaultBackend(logger)
 			// oss end
 			require.NoError(t, err)
 			storage := &logical.InmemStorage{}
@@ -345,7 +346,7 @@ func TestNewCore_badRedirectAddr(t *testing.T) {
 	logger = logging.NewVaultLogger(log.Trace)
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatal(err)

@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/openbao/openbao/helper/namespace"
-	"github.com/openbao/openbao/physical/tdengine"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -325,7 +324,7 @@ func (c *Core) teardownNamespaceStore() error {
 }
 
 func (ps *NamespaceStore) invalidate(ctx context.Context, path string) error {
-	if td, ok := ps.getTD(); ok {
+	if td, ok := ps.getMountable(); ok {
 		ns, err := namespace.FromContext(ctx)
 		if err != nil {
 			return err
@@ -346,20 +345,17 @@ func (ps *NamespaceStore) invalidate(ctx context.Context, path string) error {
 	return nil
 }
 
-func getTD(b physical.Backend) (*tdengine.TDEngineBackend, bool) {
-	switch t := b.(type) {
-	case *physical.ErrorInjector:
-		td, ok := t.GetBackend().(*tdengine.TDEngineBackend)
-		return td, ok
-	case *tdengine.TDEngineBackend:
-		return t, true
-	default:
+func physicalToMountable(pb physical.Backend) (physical.Mountable, bool) {
+	x := pb
+	if t, ok := pb.(*physical.ErrorInjector); ok {
+		x = t.GetBackend()
 	}
-	return nil, false
+	physical, ok := x.(physical.Mountable)
+	return physical, ok
 }
 
-func (ps *NamespaceStore) getTD() (td *tdengine.TDEngineBackend, ok bool) {
-	return getTD(ps.core.underlyingPhysical)
+func (ps *NamespaceStore) getMountable() (physical.Mountable, bool) {
+	return physicalToMountable(ps.core.underlyingPhysical)
 }
 
 // SetNamespace is used to create or update the given namespace
@@ -385,14 +381,13 @@ func (ps *NamespaceStore) SetNamespace(ctx context.Context, path string, meta ma
 		return fmt.Errorf("unable to get the barrier subview for namespace")
 	}
 
-	td, ok := ps.getTD()
-	if !ok {
-		return fmt.Errorf("failed to get tdengine backend in namespace set")
-	}
-
 	if init == nil && path == namespace.RootNamespaceID {
 		return fmt.Errorf(`cannot update "root" namespace`)
 	} else if path != namespace.RootNamespaceID {
+		td, ok := ps.getMountable()
+		if !ok {
+			return fmt.Errorf("failed to get mountable backend in namespace set")
+		}
 		err := td.CreateIfNotExists(ctx, path)
 		if err != nil {
 			return fmt.Errorf("failed to create namespace table for %s: %w", path, err)
@@ -462,11 +457,6 @@ func (ps *NamespaceStore) ListNamespaces(ctx context.Context) ([]string, error) 
 func (ps *NamespaceStore) DeleteNamespace(ctx context.Context, path string) error {
 	defer metrics.MeasureSince([]string{"namespace", "delete_namespace"}, time.Now())
 
-	td, ok := ps.getTD()
-	if !ok {
-		return fmt.Errorf("failed to get tdengine backend in delete")
-	}
-
 	ps.modifyLock.Lock()
 	defer ps.modifyLock.Unlock()
 
@@ -485,10 +475,15 @@ func (ps *NamespaceStore) DeleteNamespace(ctx context.Context, path string) erro
 		return fmt.Errorf(`cannot delete "root" namespace`)
 	}
 
+	td, ok := ps.getMountable()
+	if !ok {
+		return fmt.Errorf("failed to get mountable backend in delete")
+	}
 	err := td.DropIfExists(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to drop namespace table for %s: %w", path, err)
 	}
+
 	err = view.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete namespace: %w", err)

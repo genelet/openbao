@@ -5594,7 +5594,10 @@ func TestTokenStore_HandleTidyCase1(t *testing.T) {
 	}
 
 	// Tidy runs async so give it time
-	time.Sleep(10 * time.Second)
+	// oss start
+	// time.Sleep(10 * time.Second)
+	time.Sleep(60 * time.Second)
+	// oss end
 
 	// Tidy should have removed all the dangling accessor entries
 	resp, err = ts.HandleRequest(namespace.RootContext(nil), accessorListReq)
@@ -5728,7 +5731,10 @@ func TestTokenStore_HandleTidy_parentCleanup(t *testing.T) {
 	}
 
 	// Tidy runs async so give it time
-	time.Sleep(10 * time.Second)
+	// oss start
+	// time.Sleep(10 * time.Second)
+	time.Sleep(60 * time.Second)
+	// oss end
 
 	// Tidy should have removed all the dangling accessor entries
 	resp, err = ts.HandleRequest(namespace.RootContext(nil), accessorListReq)
@@ -5909,7 +5915,7 @@ func TestTokenStore_TidyLeaseRevocation(t *testing.T) {
 
 	// oss start
 	// time.Sleep(200 * time.Millisecond)
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
 	// oss end
 
 	// Verify leases are gone

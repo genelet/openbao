@@ -187,7 +187,7 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 		return fmt.Errorf("cannot mount under existing mount %q", existing)
 	}
 
-	if td, okk := getTD(r.underlyingPhysical); okk {
+	if td, okk := physicalToMountable(r.underlyingPhysical); okk {
 		ctx := namespace.ContextWithNamespace(context.Background(), &namespace.Namespace{ID: mountEntry.NamespaceID})
 		if err := td.AddMount(ctx, originalPrefix, mountEntry.Type); err != nil {
 			return err
@@ -294,7 +294,7 @@ func (r *Router) Remount(ctx context.Context, src, dst string) error {
 
 	// oss start
 	// update the auth mount endpoint in the namespace-based mount table
-	if td, ok := getTD(r.underlyingPhysical); ok {
+	if td, ok := physicalToMountable(r.underlyingPhysical); ok {
 		var typ string
 		if routeEntry, ok := raw.(*routeEntry); ok {
 			if mt := routeEntry.mountEntry; mt != nil {

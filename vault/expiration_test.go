@@ -24,6 +24,7 @@ import (
 	"github.com/openbao/openbao/helper/fairshare"
 	"github.com/openbao/openbao/helper/metricsutil"
 	"github.com/openbao/openbao/helper/namespace"
+	"github.com/openbao/openbao/physical/env"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -692,7 +693,7 @@ func BenchmarkExpiration_Restore_InMem(b *testing.B) {
 	logger := logging.NewVaultLogger(log.Trace)
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		b.Fatal(err)
@@ -767,7 +768,7 @@ func BenchmarkExpiration_Create_Leases(b *testing.B) {
 	logger := logging.NewVaultLogger(log.Trace)
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		b.Fatal(err)

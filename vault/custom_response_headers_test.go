@@ -13,12 +13,10 @@ import (
 	log "github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/internalshared/configutil"
+	"github.com/openbao/openbao/physical/env"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/helper/testhelpers/schema"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	// oss start
-	//"github.com/openbao/openbao/sdk/v2/physical/inmem"
-	// oss end
 )
 
 var defaultCustomHeaders = map[string]string{
@@ -58,7 +56,7 @@ func TestConfigCustomHeaders(t *testing.T) {
 	logger := logging.NewVaultLogger(log.Trace)
 	// oss start
 	// phys, err := inmem.NewInmem(nil, logger)
-	phys, err := newTD(logger)
+	phys, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatal(err)

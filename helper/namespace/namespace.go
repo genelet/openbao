@@ -58,10 +58,15 @@ func ContextWithNamespace(ctx context.Context, ns *Namespace) context.Context {
 }
 
 func RootContext(ctx context.Context) context.Context {
-	if ctx == nil {
-		return ContextWithNamespace(context.Background(), RootNamespace)
+	rootNS := &Namespace{
+		ID:             RootNamespaceID,
+		Path:           "",
+		CustomMetadata: make(map[string]string),
 	}
-	return ContextWithNamespace(ctx, RootNamespace)
+	if ctx == nil {
+		return ContextWithNamespace(context.Background(), rootNS)
+	}
+	return ContextWithNamespace(ctx, rootNS)
 }
 
 // FromContext retrieves the namespace from a context, or an error

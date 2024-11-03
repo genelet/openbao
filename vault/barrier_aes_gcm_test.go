@@ -13,6 +13,7 @@ import (
 
 	log "github.com/hashicorp/go-hclog"
 	"github.com/openbao/openbao/helper/testhelpers/corehelpers"
+	"github.com/openbao/openbao/physical/env"
 	"github.com/openbao/openbao/sdk/v2/helper/logging"
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -25,7 +26,7 @@ var logger = logging.NewVaultLogger(log.Trace)
 func mockBarrier(t testing.TB) (physical.Backend, SecurityBarrier, []byte) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -45,7 +46,7 @@ func mockBarrier(t testing.TB) (physical.Backend, SecurityBarrier, []byte) {
 func TestAESGCMBarrier_Basic(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -63,7 +64,7 @@ func TestAESGCMBarrier_Basic(t *testing.T) {
 func TestAESGCMBarrier_Rotate(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -81,7 +82,7 @@ func TestAESGCMBarrier_Rotate(t *testing.T) {
 func TestAESGCMBarrier_MissingRotateConfig(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -116,7 +117,7 @@ func TestAESGCMBarrier_MissingRotateConfig(t *testing.T) {
 func TestAESGCMBarrier_Upgrade(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -138,7 +139,7 @@ func TestAESGCMBarrier_Upgrade(t *testing.T) {
 func TestAESGCMBarrier_Upgrade_Rekey(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -160,7 +161,7 @@ func TestAESGCMBarrier_Upgrade_Rekey(t *testing.T) {
 func TestAESGCMBarrier_Rekey(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -180,7 +181,7 @@ func TestAESGCMBarrier_Rekey(t *testing.T) {
 func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -276,7 +277,7 @@ func TestAESGCMBarrier_BackwardsCompatible(t *testing.T) {
 func TestAESGCMBarrier_Confidential(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -323,7 +324,7 @@ func TestAESGCMBarrier_Confidential(t *testing.T) {
 func TestAESGCMBarrier_Integrity(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -368,7 +369,7 @@ func TestAESGCMBarrier_Integrity(t *testing.T) {
 func TestAESGCMBarrier_MoveIntegrityV1(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -419,7 +420,7 @@ func TestAESGCMBarrier_MoveIntegrityV1(t *testing.T) {
 func TestAESGCMBarrier_MoveIntegrityV2(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -470,7 +471,7 @@ func TestAESGCMBarrier_MoveIntegrityV2(t *testing.T) {
 func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -536,7 +537,7 @@ func TestAESGCMBarrier_UpgradeV1toV2(t *testing.T) {
 func TestEncrypt_Unique(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -579,7 +580,7 @@ func TestEncrypt_Unique(t *testing.T) {
 func TestInitialize_KeyLength(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -619,7 +620,7 @@ func TestInitialize_KeyLength(t *testing.T) {
 func TestEncrypt_BarrierEncryptor(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -662,7 +663,7 @@ func TestEncrypt_BarrierEncryptor(t *testing.T) {
 func TestDecrypt_InvalidCipherLength(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -702,7 +703,7 @@ func TestDecrypt_InvalidCipherLength(t *testing.T) {
 func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -791,7 +792,7 @@ func TestAESGCMBarrier_ReloadKeyring(t *testing.T) {
 func TestBarrier_LegacyRotate(t *testing.T) {
 	// oss start
 	// inm, err := inmem.NewInmem(nil, logger)
-	inm, err := newTD(logger)
+	inm, err := env.DefaultBackend(logger)
 	// oss end
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -866,7 +867,7 @@ func TestBarrier_persistKeyring_Context(t *testing.T) {
 			// Set up barrier
 			// oss start
 			// backend, err := inmem.NewInmem(nil, corehelpers.NewTestLogger(t))
-			backend, err := newTD(corehelpers.NewTestLogger(t))
+			backend, err := env.DefaultBackend(corehelpers.NewTestLogger(t))
 			// oss end
 			require.NoError(t, err)
 			security_barrier, err := NewAESGCMBarrier(backend)
