@@ -11,7 +11,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	mathrand "math/rand"
@@ -28,10 +27,10 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/namespace"
+	cache "github.com/openbao/openbao/physical/pcache"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/identitytpl"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	"github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -99,10 +98,8 @@ type discovery struct {
 
 // oidcCache is a thin wrapper around go-cache to partition by namespace
 type oidcCache struct {
-	c *cache.Cache
+	cache.Cache
 }
-
-var errNilNamespace = errors.New("nil namespace in oidc cache request")
 
 const (
 	issuerPath           = "identity/oidc"
@@ -132,7 +129,11 @@ var (
 )
 
 // pseudo-namespace for cache items that don't belong to any real namespace.
-var noNamespace = &namespace.Namespace{ID: "__NO_NAMESPACE"}
+// oss start
+// var noNamespace = &namespace.Namespace{ID: "__NO_NAMESPACE"}
+var noNamespace = &namespace.Namespace{ID: "root"}
+
+// oss end
 
 func oidcPaths(i *IdentityStore) []*framework.Path {
 	return []*framework.Path{
@@ -466,13 +467,18 @@ func (i *IdentityStore) getOIDCConfig(ctx context.Context, s logical.Storage) (*
 		return nil, err
 	}
 
-	v, ok, err := i.oidcCache.Get(ns, "config")
+	// oss start
+	// v, ok, err := i.oidcCache.Get(ns, "config")
+	v := new(oidcConfig)
+	ok, err := i.oidcCache.Get(ns, "config", v)
 	if err != nil {
 		return nil, err
 	}
 
 	if ok {
-		return v.(*oidcConfig), nil
+		//return v.(*oidcConfig), nil
+		return v, nil
+		// oss end
 	}
 
 	var c oidcConfig
@@ -983,13 +989,16 @@ func (i *IdentityStore) getNamedKey(ctx context.Context, s logical.Storage, name
 	}
 
 	// Attempt to get the key from the cache
-	keyRaw, found, err := i.oidcCache.Get(ns, namedKeyCachePrefix+name)
+	// oss start
+	key := namedKey{}
+	found, err := i.oidcCache.Get(ns, namedKeyCachePrefix+name, &key)
 	if err != nil {
 		return nil, err
 	}
-	if key, ok := keyRaw.(*namedKey); ok && found {
-		return key, nil
+	if found {
+		return &key, nil
 	}
+	// oss end
 
 	// Fall back to reading the key from storage
 	entry, err := s.Get(ctx, namedKeyConfigPath+name)
@@ -999,7 +1008,10 @@ func (i *IdentityStore) getNamedKey(ctx context.Context, s logical.Storage, name
 	if entry == nil {
 		return nil, nil
 	}
-	var key namedKey
+
+	// oss start
+	//var key namedKey
+	// oss end
 	if err := entry.DecodeJSON(&key); err != nil {
 		return nil, err
 	}
@@ -1338,13 +1350,19 @@ func (i *IdentityStore) pathOIDCDiscovery(ctx context.Context, req *logical.Requ
 		return nil, err
 	}
 
-	v, ok, err := i.oidcCache.Get(ns, "discoveryResponse")
+	// oss start
+	// v, ok, err := i.oidcCache.Get(ns, "discoveryResponse")
+	v := []byte{}
+	ok, err := i.oidcCache.Get(ns, "discoveryResponse", &v)
+	// oss end
 	if err != nil {
 		return nil, err
 	}
 
-	if ok {
-		data = v.([]byte)
+	//if ok {
+	//	data = v.([]byte)
+	if ok && len(v) > 0 {
+		data = v
 	} else {
 		c, err := i.getOIDCConfig(ctx, req.Storage)
 		if err != nil {
@@ -1386,26 +1404,40 @@ func (i *IdentityStore) pathOIDCDiscovery(ctx context.Context, req *logical.Requ
 func (i *IdentityStore) getKeysCacheControlHeader() (string, error) {
 	// if jwksCacheControlMaxAge is set use that, otherwise fall back on the
 	// more conservative nextRun values
-	jwksCacheControlMaxAge, ok, err := i.oidcCache.Get(noNamespace, "jwksCacheControlMaxAge")
+	// oss start
+	// jwksCacheControlMaxAge, ok, err := i.oidcCache.Get(noNamespace, "jwksCacheControlMaxAge")
+	var jwksCacheControlMaxAge time.Duration
+	ok, err := i.oidcCache.Get(noNamespace, "jwksCacheControlMaxAge", &jwksCacheControlMaxAge)
+	// oss end
 	if err != nil {
 		return "", err
 	}
 
 	if ok {
-		maxDuration := int64(jwksCacheControlMaxAge.(time.Duration))
+		// oss start
+		// maxDuration := int64(jwksCacheControlMaxAge.(time.Duration))
+		maxDuration := int64(jwksCacheControlMaxAge)
+		// oss end
 		randDuration := mathrand.Int63n(maxDuration)
 		durationInSeconds := time.Duration(randDuration).Seconds()
 		return fmt.Sprintf("max-age=%.0f", durationInSeconds), nil
 	}
 
-	nextRun, ok, err := i.oidcCache.Get(noNamespace, "nextRun")
+	// oss start
+	// nextRun, ok, err := i.oidcCache.Get(noNamespace, "nextRun")
+	var nextRun time.Time
+	ok, err = i.oidcCache.Get(noNamespace, "nextRun", &nextRun)
+	// oss end
 	if err != nil {
 		return "", err
 	}
 
 	if ok {
 		now := time.Now()
-		expireAt := nextRun.(time.Time)
+		// oss start
+		// expireAt := nextRun.(time.Time)
+		expireAt := nextRun
+		// oss end
 		if expireAt.After(now) {
 			i.Logger().Debug("use nextRun value for Cache Control header", "nextRun", nextRun)
 			expireInSeconds := expireAt.Sub(time.Now()).Seconds()
@@ -1425,13 +1457,18 @@ func (i *IdentityStore) pathOIDCReadPublicKeys(ctx context.Context, req *logical
 		return nil, err
 	}
 
-	v, ok, err := i.oidcCache.Get(ns, "jwksResponse")
+	// oss start
+	// v, ok, err := i.oidcCache.Get(ns, "jwksResponse")
+	v := []byte{}
+	ok, err := i.oidcCache.Get(ns, "jwksResponse", &v)
+	// oss end
 	if err != nil {
 		return nil, err
 	}
 
 	if ok {
-		data = v.([]byte)
+		//data = v.([]byte)
+		data = v
 	} else {
 		jwks, err := i.generatePublicJWKS(ctx, req.Storage)
 		if err != nil {
@@ -1715,13 +1752,20 @@ func (i *IdentityStore) generatePublicJWKS(ctx context.Context, s logical.Storag
 		return nil, err
 	}
 
-	jwksRaw, ok, err := i.oidcCache.Get(ns, "jwks")
+	// oss start
+	// jwksRaw, ok, err := i.oidcCache.Get(ns, "jwks")
+	jwksRaw := new(jose.JSONWebKeySet)
+	ok, err := i.oidcCache.Get(ns, "jwks", jwksRaw)
+	// oss end
 	if err != nil {
 		return nil, err
 	}
 
 	if ok {
-		return jwksRaw.(*jose.JSONWebKeySet), nil
+		// oss start
+		// return jwksRaw.(*jose.JSONWebKeySet), nil
+		return jwksRaw, nil
+		// oss end
 	}
 
 	if _, err := i.expireOIDCPublicKeys(ctx, s); err != nil {
@@ -1768,7 +1812,14 @@ func (i *IdentityStore) generatePublicJWKS(ctx context.Context, s logical.Storag
 		jwks.Keys = append(jwks.Keys, *key)
 	}
 
-	if err := i.oidcCache.SetDefault(ns, "jwks", jwks); err != nil {
+	// oss start
+	// if err := i.oidcCache.SetDefault(ns, "jwks", jwks); err != nil {
+	bs, err := json.Marshal(jwks)
+	if err != nil {
+		return nil, err
+	}
+	if err := i.oidcCache.SetDefault(ns, "jwks", bs); err != nil {
+		// oss end
 		return nil, err
 	}
 
@@ -1956,15 +2007,18 @@ func (i *IdentityStore) oidcPeriodicFunc(ctx context.Context) {
 	var nextRun time.Time
 	now := time.Now()
 
-	v, ok, err := i.oidcCache.Get(noNamespace, "nextRun")
-	if err != nil {
+	// oss start
+	// v, ok, err := i.oidcCache.Get(noNamespace, "nextRun")
+	ok, err := i.oidcCache.Get(noNamespace, "nextRun", &nextRun)
+	if err != nil || !ok {
 		i.Logger().Error("error reading oidc cache", "err", err)
 		return
 	}
 
-	if ok {
-		nextRun = v.(time.Time)
-	}
+	//if ok {
+	//	nextRun = v.(time.Time)
+	//}
+	// oss end
 
 	// The condition here is for performance, not precise timing. The actions can
 	// be run at any time safely, but there is no need to invoke them (which
@@ -2035,6 +2089,8 @@ func (i *IdentityStore) oidcPeriodicFunc(ctx context.Context) {
 	}
 }
 
+// oss start
+/*
 func newOIDCCache(defaultExpiration, cleanupInterval time.Duration) *oidcCache {
 	return &oidcCache{
 		c: cache.New(defaultExpiration, cleanupInterval),
@@ -2092,3 +2148,26 @@ func isTargetNamespacedKey(nskey string, nsTargets []string) bool {
 	split := strings.Split(nskey, ":")
 	return len(split) >= 3 && strutil.StrListContains(nsTargets, split[1])
 }
+*/
+func newOIDCCache(nsID, name string, defaultExpiration, cleanupInterval time.Duration, logger hclog.Logger) (*oidcCache, error) {
+	c, err := cache.New(nsID, name, defaultExpiration, cleanupInterval, logger)
+	return &oidcCache{Cache: c}, err
+}
+
+func (c *oidcCache) Get(ns *namespace.Namespace, key string, obj interface{}) (bool, error) {
+	return c.Cache.GetNS(ns, key, obj)
+}
+
+func (c *oidcCache) SetDefault(ns *namespace.Namespace, key string, obj interface{}) error {
+	return c.SetDefaultNS(ns, key, obj)
+}
+
+func (c *oidcCache) Delete(ns *namespace.Namespace, key string) error {
+	return c.Cache.DeleteNS(ns, key)
+}
+
+func (c *oidcCache) Flush(ns *namespace.Namespace) error {
+	return c.Cache.FlushNS(ns)
+}
+
+// oss end

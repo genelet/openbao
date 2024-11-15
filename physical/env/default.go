@@ -15,7 +15,7 @@ func DefaultBackend(logger log.Logger) (physical.Backend, error) {
 	switch strings.ToLower(os.Getenv("OPENBAO_MOUNTABLE")) {
 	case "tdengine":
 		physicalBackend, err := tdengine.NewTDEngineBackend(map[string]string{
-			"connection_url": "root:taosdata@tcp(vm0:6030)/testbao",
+			"connection_url": "root:taosdata@tcp(vm0:6030)/testbao?readTimeout=20m",
 			"database":       "testbao",
 		}, logger)
 		if err == nil {

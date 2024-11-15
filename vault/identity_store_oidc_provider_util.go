@@ -98,7 +98,10 @@ func computeCodeChallenge(verifier string, method string) (string, error) {
 
 // authCodeUsedPKCE returns true if the given entry was granted using PKCE.
 func authCodeUsedPKCE(entry *authCodeCacheEntry) bool {
-	return entry.codeChallenge != "" && entry.codeChallengeMethod != ""
+	// oss start
+	//return entry.codeChallenge != "" && entry.codeChallengeMethod != ""
+	return entry.CodeChallenge != "" && entry.CodeChallengeMethod != ""
+	// oss end
 }
 
 // basicAuth returns the username/password provided in the logical.Request's

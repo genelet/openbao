@@ -33,13 +33,13 @@ import (
 	"github.com/openbao/openbao/helper/identity"
 	"github.com/openbao/openbao/helper/identity/mfa"
 	"github.com/openbao/openbao/helper/namespace"
+	cache "github.com/openbao/openbao/physical/pcache"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/identitytpl"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
 	"github.com/openbao/openbao/sdk/v2/helper/parseutil"
 	"github.com/openbao/openbao/sdk/v2/helper/strutil"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	"github.com/patrickmn/go-cache"
 	otplib "github.com/pquerna/otp"
 	totplib "github.com/pquerna/otp/totp"
 )
@@ -116,7 +116,7 @@ type MFABackend struct {
 	mfaLogger   hclog.Logger
 	namespacer  Namespacer
 	methodTable string
-	usedCodes   *cache.Cache
+	usedCodes   cache.Cache
 }
 
 type LoginMFABackend struct {
@@ -2325,7 +2325,7 @@ func (c *Core) validatePingID(ctx context.Context, mConfig *mfa.Config, username
 	return nil
 }
 
-func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMethodSecret *mfa.Secret, configID, entityID string, usedCodes *cache.Cache, maximumValidationAttempts uint32) error {
+func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMethodSecret *mfa.Secret, configID, entityID string, usedCodes cache.Cache, maximumValidationAttempts uint32) error {
 	if mfaFactors == nil || mfaFactors.passcode == "" {
 		return fmt.Errorf("MFA credentials not supplied")
 	}
@@ -2338,10 +2338,16 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 
 	usedName := fmt.Sprintf("%s_%s", configID, passcode)
 
-	_, ok := usedCodes.Get(usedName)
+	// oss start
+	//_, ok := usedCodes.Get(usedName)
+	ok, err := usedCodes.Get(usedName, nil)
+	if err != nil {
+		return fmt.Errorf("error getting used code from cache: %w", err)
+	}
 	if ok {
 		return fmt.Errorf("code already used; new code is available in %v seconds", totpSecret.Period)
 	}
+	// oss end
 
 	// The duration in which a passcode is stored in cache to enforce
 	// rate limit on failed totp passcode validation
@@ -2350,14 +2356,13 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 	// Enforcing rate limit per MethodID per EntityID
 	rateLimitID := fmt.Sprintf("%s_%s", configID, entityID)
 
-	numAttempts, _ := usedCodes.Get(rateLimitID)
-	if numAttempts == nil {
-		usedCodes.Set(rateLimitID, uint32(1), passcodeTTL)
-	} else {
-		num, ok := numAttempts.(uint32)
-		if !ok {
-			return fmt.Errorf("invalid counter type returned in TOTP usedCode cache")
-		}
+	// oss start
+	var num uint32
+	ok, err = usedCodes.Get(rateLimitID, &num)
+	if err != nil {
+		return fmt.Errorf("error getting used code from cache: %w", err)
+	}
+	if ok {
 		if num == maximumValidationAttempts {
 			return fmt.Errorf("maximum TOTP validation attempts %d exceeded the allowed attempts %d. Please try again in %v seconds", num+1, maximumValidationAttempts, passcodeTTL)
 		}
@@ -2365,7 +2370,10 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 		if err != nil {
 			return fmt.Errorf("failed to increment the TOTP code counter")
 		}
+	} else {
+		usedCodes.Set(rateLimitID, uint32(1), passcodeTTL)
 	}
+	// oss end
 
 	key, err := c.fetchTOTPKey(ctx, configID, entityID)
 	if err != nil {
@@ -2403,9 +2411,11 @@ func (c *Core) validateTOTP(ctx context.Context, mfaFactors *MFAFactor, entityMe
 	}
 
 	// deleting the cache entry after a successful MFA validation
-	usedCodes.Delete(rateLimitID)
+	// oss start
+	return usedCodes.Delete(rateLimitID)
 
-	return nil
+	//return nil
+	// oss end
 }
 
 func loginMFAConfigTableSchema() *memdb.TableSchema {

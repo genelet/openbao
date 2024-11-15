@@ -85,7 +85,12 @@ func newBarrierView(s logical.StorageView) BarrierView {
 
 	if _, ok := s.(logical.TransactionalStorageView); ok {
 		return &transactionalBarrierView{
-			*bv,
+			// oss start
+			//*bv,
+			barrierView: barrierView{
+				storage: s,
+			},
+			// oss end
 		}
 	}
 

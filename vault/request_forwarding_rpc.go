@@ -5,6 +5,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/armon/go-metrics"
 	"github.com/openbao/openbao/helper/forwarding"
+	"github.com/openbao/openbao/physical/pcache"
 	"github.com/openbao/openbao/physical/raft"
 	"github.com/openbao/openbao/sdk/v2/helper/consts"
 )
@@ -65,21 +67,40 @@ func (s *forwardedRequestRPCServer) ForwardRequest(ctx context.Context, freq *fo
 }
 
 type nodeHAConnectionInfo struct {
-	nodeInfo       *NodeInformation
-	lastHeartbeat  time.Time
-	version        string
-	upgradeVersion string
+	// oss start
+	//nodeInfo       *NodeInformation
+	//lastHeartbeat  time.Time
+	//version        string
+	//upgradeVersion string
+	NodeInfo       *NodeInformation
+	LastHeartbeat  time.Time
+	Version        string
+	UpgradeVersion string
+	// oss end
 }
 
 func (s *forwardedRequestRPCServer) Echo(ctx context.Context, in *EchoRequest) (*EchoReply, error) {
 	incomingNodeConnectionInfo := nodeHAConnectionInfo{
-		nodeInfo:       in.NodeInfo,
-		lastHeartbeat:  time.Now(),
-		version:        in.SdkVersion,
-		upgradeVersion: in.RaftUpgradeVersion,
+		// oss start
+		//nodeInfo:       in.NodeInfo,
+		//lastHeartbeat:  time.Now(),
+		//version:        in.SdkVersion,
+		//upgradeVersion: in.RaftUpgradeVersion,
+		NodeInfo:       in.NodeInfo,
+		LastHeartbeat:  time.Now(),
+		Version:        in.SdkVersion,
+		UpgradeVersion: in.RaftUpgradeVersion,
+		// oss end
 	}
 	if in.ClusterAddr != "" {
-		s.core.clusterPeerClusterAddrsCache.Set(in.ClusterAddr, incomingNodeConnectionInfo, 0)
+		// oss start
+		//s.core.clusterPeerClusterAddrsCache.Set(in.ClusterAddr, incomingNodeConnectionInfo, 0)
+		bs, err := json.Marshal(incomingNodeConnectionInfo)
+		if err != nil {
+			return nil, err
+		}
+		s.core.clusterPeerClusterAddrsCache.Set(in.ClusterAddr, bs, pcache.MarkerDefaultExpiration)
+		// oss end
 	}
 
 	if in.RaftAppliedIndex > 0 && len(in.RaftNodeID) > 0 && s.raftFollowerStates != nil {

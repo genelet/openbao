@@ -19,9 +19,9 @@ import (
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
 	"github.com/openbao/openbao/helper/versions"
+	cache "github.com/openbao/openbao/physical/pcache"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
-	"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -118,9 +118,21 @@ func NewIdentityStore(ctx context.Context, core *Core, config *logical.BackendCo
 		RunningVersion: versions.DefaultBuiltinVersion,
 	}
 
-	iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
-	iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
-
+	// oss start
+	// iStore.oidcCache = newOIDCCache(cache.NoExpiration, cache.NoExpiration)
+	// iStore.oidcAuthCodeCache = newOIDCCache(5*time.Minute, 5*time.Minute)
+	ns, err := namespace.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	iStore.oidcCache, err = newOIDCCache(ns.ID, "oidc", cache.MarkerNoExpiration, cache.MarkerNoExpiration, logger)
+	if err != nil {
+		return nil, err
+	}
+	iStore.oidcAuthCodeCache, err = newOIDCCache(ns.ID, "oidc-auth", 5*time.Minute, 5*time.Minute, logger)
+	if err != nil {
+		return nil, err
+	}
 	err = iStore.Setup(ctx, config)
 	if err != nil {
 		return nil, err

@@ -169,15 +169,28 @@ type providerDiscovery struct {
 }
 
 type authCodeCacheEntry struct {
-	provider            string
-	clientID            string
-	entityID            string
-	redirectURI         string
-	nonce               string
-	scopes              []string
-	authTime            time.Time
-	codeChallenge       string
-	codeChallengeMethod string
+	// oss start
+	/*
+		provider            string
+		clientID            string
+		entityID            string
+		redirectURI         string
+		nonce               string
+		scopes              []string
+		authTime            time.Time
+		codeChallenge       string
+		codeChallengeMethod string
+	*/
+	Provider            string
+	ClientID            string
+	EntityID            string
+	RedirectURI         string
+	Nonce               string
+	Scopes              []string
+	AuthTime            time.Time
+	CodeChallenge       string
+	CodeChallengeMethod string
+	// oss end
 }
 
 func oidcProviderPaths(i *IdentityStore) []*framework.Path {
@@ -1788,12 +1801,20 @@ func (i *IdentityStore) pathOIDCAuthorize(ctx context.Context, req *logical.Requ
 
 	// Create the auth code cache entry
 	authCodeEntry := &authCodeCacheEntry{
-		provider:    name,
-		clientID:    clientID,
-		entityID:    entity.GetID(),
-		redirectURI: redirectURI,
-		nonce:       nonce,
-		scopes:      scopes,
+		// oss start
+		//provider:    name,
+		//clientID:    clientID,
+		//entityID:    entity.GetID(),
+		//redirectURI: redirectURI,
+		//nonce:       nonce,
+		//scopes:      scopes,
+		Provider:    name,
+		ClientID:    clientID,
+		EntityID:    entity.GetID(),
+		RedirectURI: redirectURI,
+		Nonce:       nonce,
+		Scopes:      scopes,
+		// oss end
 	}
 
 	// Validate the Proof Key for Code Exchange (PKCE) code challenge and code challenge
@@ -1823,8 +1844,12 @@ func (i *IdentityStore) pathOIDCAuthorize(ctx context.Context, req *logical.Requ
 
 		// Associate the code challenge and method with the authorization code.
 		// This will be used to verify the code verifier in the token exchange.
-		authCodeEntry.codeChallenge = codeChallenge
-		authCodeEntry.codeChallengeMethod = codeChallengeMethod
+		// oss start
+		//authCodeEntry.codeChallenge = codeChallenge
+		//authCodeEntry.codeChallengeMethod = codeChallengeMethod
+		authCodeEntry.CodeChallenge = codeChallenge
+		authCodeEntry.CodeChallengeMethod = codeChallengeMethod
+		// oss end
 	}
 
 	// Validate the optional max_age parameter to check if an active re-authentication
@@ -1855,7 +1880,10 @@ func (i *IdentityStore) pathOIDCAuthorize(ctx context.Context, req *logical.Requ
 		}
 
 		// Set the auth time to use for the auth_time claim in the token exchange
-		authCodeEntry.authTime = lastAuthTime
+		// oss start
+		//authCodeEntry.authTime = lastAuthTime
+		authCodeEntry.AuthTime = lastAuthTime
+		// oss end
 	}
 
 	// Generate the authorization code
@@ -1997,7 +2025,11 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	}
 
 	// Get the authorization code entry and defer its deletion (single use)
-	authCodeEntryRaw, ok, err := i.oidcAuthCodeCache.Get(ns, code)
+	// oss start
+	// authCodeEntryRaw, ok, err := i.oidcAuthCodeCache.Get(ns, code)
+	authCodeEntry := &authCodeCacheEntry{}
+	ok, err := i.oidcAuthCodeCache.Get(ns, code, authCodeEntry)
+	// oss end
 	defer i.oidcAuthCodeCache.Delete(ns, code)
 	if err != nil {
 		return tokenResponse(nil, ErrTokenServerError, err.Error())
@@ -2005,18 +2037,26 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	if !ok {
 		return tokenResponse(nil, ErrTokenInvalidGrant, "authorization grant is invalid or expired")
 	}
-	authCodeEntry, ok := authCodeEntryRaw.(*authCodeCacheEntry)
-	if !ok {
-		return tokenResponse(nil, ErrTokenServerError, "authorization grant is invalid or expired")
-	}
+	// oss start
+	// authCodeEntry, ok := authCodeEntryRaw.(*authCodeCacheEntry)
+	// if !ok {
+	//   return tokenResponse(nil, ErrTokenServerError, "authorization grant is invalid or expired")
+	//}
+	// oss end
 
 	// Ensure the authorization code was issued to the authenticated client
-	if authCodeEntry.clientID != clientID {
+	// oss start
+	//if authCodeEntry.clientID != clientID {
+	if authCodeEntry.ClientID != clientID {
+		// oss end
 		return tokenResponse(nil, ErrTokenInvalidGrant, "authorization code was not issued to the client")
 	}
 
 	// Ensure the authorization code was issued by the provider
-	if authCodeEntry.provider != name {
+	// oss start
+	//if authCodeEntry.provider != name {
+	if authCodeEntry.Provider != name {
+		// oss end
 		return tokenResponse(nil, ErrTokenInvalidGrant, "authorization code was not issued by the provider")
 	}
 
@@ -2026,12 +2066,18 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	if redirectURI == "" {
 		return tokenResponse(nil, ErrTokenInvalidRequest, "redirect_uri parameter is required")
 	}
-	if authCodeEntry.redirectURI != redirectURI {
+	// oss start
+	//if authCodeEntry.redirectURI != redirectURI {
+	if authCodeEntry.RedirectURI != redirectURI {
+		// oss end
 		return tokenResponse(nil, ErrTokenInvalidGrant, "redirect_uri does not match the redirect_uri used in the authorization request")
 	}
 
 	// Get the entity associated with the initial authorization request
-	entity, err := i.MemDBEntityByID(authCodeEntry.entityID, true)
+	// oss start
+	//entity, err := i.MemDBEntityByID(authCodeEntry.entityID, true)
+	entity, err := i.MemDBEntityByID(authCodeEntry.EntityID, true)
+	// oss end
 	if err != nil {
 		return tokenResponse(nil, ErrTokenServerError, err.Error())
 	}
@@ -2060,12 +2106,18 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	case usedPKCE && codeVerifier == "":
 		return tokenResponse(nil, ErrTokenInvalidRequest, "expected code_verifier for token exchange")
 	case usedPKCE:
-		codeChallenge, err := computeCodeChallenge(codeVerifier, authCodeEntry.codeChallengeMethod)
+		// oss start
+		//codeChallenge, err := computeCodeChallenge(codeVerifier, authCodeEntry.codeChallengeMethod)
+		codeChallenge, err := computeCodeChallenge(codeVerifier, authCodeEntry.CodeChallengeMethod)
+		// oss end
 		if err != nil {
 			return tokenResponse(nil, ErrTokenServerError, err.Error())
 		}
 
-		if subtle.ConstantTimeCompare([]byte(codeChallenge), []byte(authCodeEntry.codeChallenge)) == 0 {
+		// oss start
+		//if subtle.ConstantTimeCompare([]byte(codeChallenge), []byte(authCodeEntry.codeChallenge)) == 0 {
+		if subtle.ConstantTimeCompare([]byte(codeChallenge), []byte(authCodeEntry.CodeChallenge)) == 0 {
+			// oss end
 			return tokenResponse(nil, ErrTokenInvalidGrant, "invalid code_verifier for token exchange")
 		}
 	}
@@ -2087,7 +2139,10 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 		},
 		InternalMeta: map[string]string{
 			accessTokenClientIDMeta: client.ClientID,
-			accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
+			// oss start
+			//accessTokenScopesMeta:   strings.Join(authCodeEntry.scopes, scopesDelimiter),
+			accessTokenScopesMeta: strings.Join(authCodeEntry.Scopes, scopesDelimiter),
+			// oss end
 		},
 		InlinePolicy: fmt.Sprintf(`
 			path "identity/oidc/provider/%s/userinfo" {
@@ -2116,11 +2171,16 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	idTokenIssuedAt := time.Now()
 	idTokenExpiry := idTokenIssuedAt.Add(client.IDTokenTTL)
 	idToken := idToken{
-		Namespace:       ns.ID,
-		Issuer:          provider.effectiveIssuer,
-		Subject:         authCodeEntry.entityID,
-		Audience:        authCodeEntry.clientID,
-		Nonce:           authCodeEntry.nonce,
+		Namespace: ns.ID,
+		Issuer:    provider.effectiveIssuer,
+		// oss start
+		//Subject:         authCodeEntry.entityID,
+		//Audience:        authCodeEntry.clientID,
+		//Nonce:           authCodeEntry.nonce,
+		Subject:  authCodeEntry.EntityID,
+		Audience: authCodeEntry.ClientID,
+		Nonce:    authCodeEntry.Nonce,
+		// oss end
 		Expiry:          idTokenExpiry.Unix(),
 		IssuedAt:        idTokenIssuedAt.Unix(),
 		AccessTokenHash: atHash,
@@ -2128,12 +2188,19 @@ func (i *IdentityStore) pathOIDCToken(ctx context.Context, req *logical.Request,
 	}
 
 	// Add the auth_time claim if it's not the zero time instant
-	if !authCodeEntry.authTime.IsZero() {
-		idToken.AuthTime = authCodeEntry.authTime.Unix()
+	// oss start
+	//if !authCodeEntry.authTime.IsZero() {
+	//	idToken.AuthTime = authCodeEntry.authTime.Unix()
+	if !authCodeEntry.AuthTime.IsZero() {
+		idToken.AuthTime = authCodeEntry.AuthTime.Unix()
+		// oss end
 	}
 
 	// Populate each of the requested scope templates
-	templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, ns, entity, authCodeEntry.scopes...)
+	// oss start
+	//templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, ns, entity, authCodeEntry.scopes...)
+	templates, conflict, err := i.populateScopeTemplates(ctx, req.Storage, ns, entity, authCodeEntry.Scopes...)
+	// oss end
 	if !conflict && err != nil {
 		return tokenResponse(nil, ErrTokenServerError, err.Error())
 	}

@@ -1466,7 +1466,13 @@ func TestOIDC_Path_OIDC_ProviderReadPublicKey(t *testing.T) {
 		Operation: logical.ReadOperation,
 		Storage:   storage,
 	})
-	clientID := resp.Data["client_id"].(string)
+	// oss start
+	// clientID := resp.Data["client_id"].(string)
+	var clientID string
+	if resp != nil && resp.Data != nil && resp.Data["client_id"] != nil {
+		// oss end
+		clientID = resp.Data["client_id"].(string)
+	}
 
 	// Create a test provider "test-provider" and allow all client IDs -- should succeed
 	resp, err := c.identityStore.HandleRequest(ctx, &logical.Request{
@@ -1701,6 +1707,10 @@ func TestOIDC_Path_OIDC_ProviderClient_NilKeyEntry(t *testing.T) {
 	ctx := namespace.RootContext(nil)
 	storage := &logical.InmemStorage{}
 
+	// oss start
+	err := c.identityStore.oidcCache.Delete(&namespace.Namespace{ID: "root"}, "namedKeys/test-key")
+	require.NoError(t, err)
+	// oss end
 	// Create a test client "test-client1" with a non-existent key -- should fail
 	resp, err := c.identityStore.HandleRequest(ctx, &logical.Request{
 		Path:      "oidc/client/test-client1",
@@ -2176,7 +2186,14 @@ func TestOIDC_Path_OIDC_ProviderClient_List(t *testing.T) {
 
 	// validate list response
 	expectedStrings := map[string]interface{}{"test-client1": true, "test-client2": true}
-	expectStrings(t, respListClients.Data["keys"].([]string), expectedStrings)
+	// oss start
+	// expectStrings(t, respListClients.Data["keys"].([]string), expectedStrings)
+	if respListClients != nil && respListClients.Data != nil && respListClients.Data["keys"] != nil {
+		expectStrings(t, respListClients.Data["keys"].([]string), expectedStrings)
+	} else {
+		t.Errorf("Expected a non-nil response but got:\n%v", respListClients.Data)
+	}
+	// oss end
 
 	// delete test-client2
 	c.identityStore.HandleRequest(ctx, &logical.Request{
@@ -2195,7 +2212,14 @@ func TestOIDC_Path_OIDC_ProviderClient_List(t *testing.T) {
 
 	// validate list response
 	delete(expectedStrings, "test-client2")
-	expectStrings(t, respListClientAfterDelete.Data["keys"].([]string), expectedStrings)
+	// oss start
+	// expectStrings(t, respListClientAfterDelete.Data["keys"].([]string), expectedStrings)
+	if respListClientAfterDelete != nil && respListClientAfterDelete.Data != nil && respListClientAfterDelete.Data["keys"] != nil {
+		expectStrings(t, respListClientAfterDelete.Data["keys"].([]string), expectedStrings)
+	} else {
+		t.Errorf("Expected a non-nil response but got:\n%v", respListClientAfterDelete.Data)
+	}
+	// oss end
 }
 
 func TestOIDC_Path_OIDC_Client_List_KeyInfo(t *testing.T) {
